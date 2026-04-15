@@ -6,12 +6,12 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
  * Serena-inspired drift guard:
  * - watches tool usage during an agent run
  * - if the model keeps using generic/file-level tools without symbol-first IDE ops,
- *   blocks one generic call with a guidance reason
+ *   nudges with guidance
  * - works with both direct MCP tools and proxy mode (mcp tool)
  */
 export default function jetbrainsSymbolNudgeExtension(pi: ExtensionAPI): void {
 	const BUILTIN_GENERIC_TOOLS = new Set<string>(["read", "grep", "find", "ls", "bash"]);
-	const PROXY_DISCOVERY_HINT = [
+	const PROXY_DISCOVERY_WORKFLOW = [
 		"JetBrains MCP is running in proxy mode via the mcp tool.",
 		"Important: mcp(...) is a TOOL call, not a shell command. Never run it via bash.",
 		"",
@@ -20,49 +20,6 @@ export default function jetbrainsSymbolNudgeExtension(pi: ExtensionAPI): void {
 		"2) Call mcp with server=\"jetbrains\"",
 		"3) Call mcp with describe=\"jetbrains_<tool>\" to load exact parameter schema",
 		"4) Call mcp with tool=\"jetbrains_<tool>\" and args as JSON string",
-		"",
-		"JetBrains Tools & Usage Guidelines:",
-		"",
-		"IDE PREFERENCE: ALWAYS prefer JetBrains tools over bash `grep`, `rg`, or `find` for symbol operations and structured search.",
-		"The IDE tools are backed by the AST index. They are orders of magnitude faster, more precise, ignore comments/strings, and automatically exclude node_modules/build folders.",
-		"",
-		"1. CODE NAVIGATION (Primary Tools):",
-		"- jetbrains_search_symbol: Searches for symbols (classes, methods, fields).",
-		"  WHEN: You know the name (or part of it) of a class, method, or field.",
-		"  WHY: Provides instant exact file, line, column, and code snippets. Far superior to grepping across files.",
-		"  EXAMPLE: jetbrains_search_symbol with q: 'UserController'",
-		"- jetbrains_get_symbol_info: Retrieves information about the symbol at the specified position.",
-		"  WHEN: You need to understand a symbol's API, arguments, return type, or documentation.",
-		"  WHY: Provides full semantic context without reading the entire file, similar to Quick Documentation.",
-		"  EXAMPLE: jetbrains_get_symbol_info for filePath 'src/main.ts', line 10, column 15",
-		"",
-		"2. STRUCTURAL SEARCH (Semantic code patterns):",
-		"- jetbrains_search_structural: Searches for code patterns using Structural Search (SSR).",
-		"  WHEN: Looking for specific syntax structures (e.g., method calls, assignments, variable declarations).",
-		"  WHY: Understands AST semantically, captures variables, and cleanly ignores text strings or comments. Completely replaces complex regex searches.",
-		"  EXAMPLE: jetbrains_search_structural with pattern: 'let $var$ = 0;', fileType: 'TypeScript'",
-		"- jetbrains_get_structural_patterns: Lists predefined structural search patterns with descriptions.",
-		"  WHEN: You need reference for creating custom SSR patterns.",
-		"  WHY: Provides common search templates for general, expressions, and suspicious code.",
-		"",
-		"3. REFACTORING & EDITING:",
-		"- jetbrains_rename_refactoring: Renames a symbol (variable, function, class, etc.) in the specified file.",
-		"  WHEN: Renaming programmatic symbols.",
-		"  WHY: Intelligently updates ALL references throughout the project ensuring code integrity.",
-		"  EXAMPLE: jetbrains_rename_refactoring for pathInProject 'app.ts', symbolName: 'oldName', newName: 'NewName'",
-		"",
-		"4. ANALYSIS:",
-		"- jetbrains_get_file_problems: Analyzes the specified file for errors and warnings using IntelliJ's inspections.",
-		"  WHEN: Checking a file for syntax errors, type errors, or linting issues after edits.",
-		"  WHY: Helps identify coding issues and problems early.",
-		"  EXAMPLE: jetbrains_get_file_problems for filePath 'src/app.ts'",
-		"",
-		"Decision rules:",
-		"- ALWAYS prefer JetBrains tools over bash `grep`/`rg`/`find` for code navigation and refactoring.",
-		"- ALWAYS prefer jetbrains_search_symbol / jetbrains_get_symbol_info before text/regex for navigation.",
-		"- ALWAYS prefer jetbrains_rename_refactoring over manual text replacement for symbol renames.",
-		"- ALWAYS use jetbrains_get_file_problems to check files after making modifications.",
-		"- If args are uncertain, ALWAYS call describe first.",
 	].join("\n");
 
 	const PROXY_RECONNECT_NOTIFY =
@@ -77,8 +34,21 @@ export default function jetbrainsSymbolNudgeExtension(pi: ExtensionAPI): void {
 		"rename_refactoring",
 	]);
 
-	const THRESHOLD = 5;
+	const SEARCH_NUDGE_THRESHOLD = 3;
+	const PROBLEMS_NUDGE_THRESHOLD = 5;
 	const COOLDOWN_MS = 2 * 60 * 1000;
+	const SEARCH_BASH_REGEX = /\b(?:rg|grep|git\s+grep|find)\b/i;
+
+	type ToolCapabilities = {
+		hasMcp: boolean;
+		proxyOnly: boolean;
+		hasSearchSymbol: boolean;
+		hasSymbolInfo: boolean;
+		hasStructuralSearch: boolean;
+		hasStructuralPatterns: boolean;
+		hasRenameRefactoring: boolean;
+		hasFileProblems: boolean;
+	};
 
 	let genericStreak = 0;
 	let usedSymbolicThisRun = false;
@@ -156,37 +126,189 @@ export default function jetbrainsSymbolNudgeExtension(pi: ExtensionAPI): void {
 		return GENERIC_SUFFIXES.has(suffix);
 	}
 
-	function isProxyOnlyMode(): boolean {
-		const active = pi.getActiveTools();
-		const hasMcp = active.includes("mcp");
-		const hasDirectJetBrains = active.some((name) =>
+	function hasToolEnding(activeTools: string[], suffix: string): boolean {
+		return activeTools.some((name) => name === suffix || name.endsWith(`_${suffix}`));
+	}
+
+	function getToolCapabilities(): ToolCapabilities {
+		const activeTools = pi.getActiveTools();
+		const hasMcp = activeTools.includes("mcp");
+		const hasDirectJetBrains = activeTools.some((name) =>
 			name.startsWith("jetbrains_") || name.startsWith("phpstorm_"),
 		);
-		return hasMcp && !hasDirectJetBrains;
+
+		return {
+			hasMcp,
+			proxyOnly: hasMcp && !hasDirectJetBrains,
+			hasSearchSymbol: hasToolEnding(activeTools, "search_symbol"),
+			hasSymbolInfo: hasToolEnding(activeTools, "get_symbol_info"),
+			hasStructuralSearch: hasToolEnding(activeTools, "search_structural"),
+			hasStructuralPatterns: hasToolEnding(activeTools, "get_structural_patterns"),
+			hasRenameRefactoring: hasToolEnding(activeTools, "rename_refactoring"),
+			hasFileProblems: hasToolEnding(activeTools, "get_file_problems"),
+		};
 	}
 
-	function buildReason(toolName: string): string {
-		return [
-			`System Nudge: You are using generic tools (${toolName}) frequently.`,
-			"Please use JetBrains symbol-first tools instead for better precision:",
-			"- *_search_symbol (find class/method/field)",
-			"- *_get_symbol_info (inspect declaration/signature/docs)",
-			"- *_search_structural (semantic code pattern search)",
-			"Prefer these over plain text or regex searches for code navigation.",
-		].join("\n");
+	function hasSymbolGuidanceTarget(capabilities: ToolCapabilities): boolean {
+		return capabilities.proxyOnly
+			|| capabilities.hasSearchSymbol
+			|| capabilities.hasSymbolInfo
+			|| capabilities.hasStructuralSearch
+			|| capabilities.hasRenameRefactoring;
 	}
 
-	function buildProblemsReason(): string {
-		return [
-			"System Nudge: You have made several file modifications.",
-			"Please use the `jetbrains_get_file_problems` tool to check the edited files for syntax errors or linting issues.",
-			"This helps identify problems early and ensures the code remains valid.",
-		].join("\n");
+	function hasProblemsGuidanceTarget(capabilities: ToolCapabilities): boolean {
+		return capabilities.proxyOnly || capabilities.hasFileProblems;
+	}
+
+	function wrapSystemReminder(content: string): string {
+		return `<system-reminder>\n${content}\n</system-reminder>`;
+	}
+
+	function getGenericIncrement(toolName: string, bashCommand: string): number {
+		if (toolName === "read") return 2;
+		if (toolName === "bash" && SEARCH_BASH_REGEX.test(bashCommand)) return 2;
+		return 1;
+	}
+
+	function describeGenericTool(toolName: string, bashCommand: string): string {
+		if (toolName === "read") return "read";
+		if (toolName === "bash" && SEARCH_BASH_REGEX.test(bashCommand)) {
+			const trimmed = bashCommand.trim().replace(/\s+/g, " ");
+			const preview = trimmed.length > 80 ? `${trimmed.slice(0, 77)}...` : trimmed;
+			return `bash (${preview})`;
+		}
+		return toolName;
+	}
+
+	function buildSystemPromptHint(capabilities: ToolCapabilities): string {
+		const lines: string[] = [];
+
+		if (capabilities.proxyOnly) {
+			lines.push(PROXY_DISCOVERY_WORKFLOW, "");
+		}
+
+		lines.push(
+			"JetBrains Tools & Usage Guidelines:",
+			"",
+			"IDE PREFERENCE: ALWAYS prefer JetBrains tools over bash `grep`, `rg`, or `find` for symbol operations and structured search.",
+			"Only nudge toward tools that are actually available in this session.",
+		);
+
+		let section = 1;
+		const addSection = (title: string, body: string[]) => {
+			if (body.length === 0) return;
+			lines.push("", `${section}. ${title}`, ...body);
+			section += 1;
+		};
+
+		addSection(
+			"CODE NAVIGATION (Primary Tools)",
+			[
+				...(capabilities.proxyOnly || capabilities.hasSearchSymbol
+					? ["- *_search_symbol: find classes, methods, and fields quickly."]
+					: []),
+				...(capabilities.proxyOnly || capabilities.hasSymbolInfo
+					? ["- *_get_symbol_info: inspect declaration/signature/docs."]
+					: []),
+			],
+		);
+
+		addSection(
+			"STRUCTURAL SEARCH (Semantic code patterns)",
+			[
+				...(capabilities.proxyOnly || capabilities.hasStructuralSearch
+					? ["- *_search_structural (if supported): semantic AST pattern search."]
+					: []),
+				...(capabilities.proxyOnly || capabilities.hasStructuralPatterns
+					? ["- *_get_structural_patterns (if supported): discover known SSR templates."]
+					: []),
+			],
+		);
+
+		addSection(
+			"REFACTORING & EDITING",
+			capabilities.proxyOnly || capabilities.hasRenameRefactoring
+				? ["- *_rename_refactoring: safe symbol rename across references."]
+				: [],
+		);
+
+		addSection(
+			"ANALYSIS",
+			capabilities.proxyOnly || capabilities.hasFileProblems
+				? ["- *_get_file_problems: run IDE inspections after edits."]
+				: [],
+		);
+
+		lines.push(
+			"",
+			"Decision rules:",
+			"- ALWAYS prefer available JetBrains tools over bash `grep`/`rg`/`find` for code navigation and refactoring.",
+		);
+
+		if (capabilities.proxyOnly || capabilities.hasSearchSymbol || capabilities.hasSymbolInfo) {
+			lines.push("- ALWAYS prefer *_search_symbol / *_get_symbol_info before text/regex for navigation.");
+		}
+		if (capabilities.proxyOnly || capabilities.hasRenameRefactoring) {
+			lines.push("- ALWAYS prefer *_rename_refactoring over manual text replacement for symbol renames.");
+		}
+		if (capabilities.proxyOnly || capabilities.hasFileProblems) {
+			lines.push("- ALWAYS use *_get_file_problems to check files after making modifications.");
+		}
+		if (capabilities.proxyOnly) {
+			lines.push("- If args are uncertain, ALWAYS call mcp describe first.");
+		}
+
+		return lines.join("\n");
+	}
+
+	function buildReason(toolName: string, capabilities: ToolCapabilities): string {
+		const suggestions = [
+			...(capabilities.proxyOnly || capabilities.hasSearchSymbol
+				? ["- *_search_symbol (find class/method/field)"]
+				: []),
+			...(capabilities.proxyOnly || capabilities.hasSymbolInfo
+				? ["- *_get_symbol_info (inspect declaration/signature/docs)"]
+				: []),
+			...(capabilities.proxyOnly || capabilities.hasStructuralSearch
+				? ["- *_search_structural (semantic code pattern search, when available)"]
+				: []),
+			...(capabilities.proxyOnly || capabilities.hasRenameRefactoring
+				? ["- *_rename_refactoring (safe symbol rename)"]
+				: []),
+		];
+
+		if (suggestions.length === 0) {
+			suggestions.push("- No symbol-first JetBrains tools are currently available in this session.");
+		}
+
+		return wrapSystemReminder(
+			[
+				`System Nudge: You are using generic tools (${toolName}) frequently.`,
+				"Please use available JetBrains symbol-first tools for better precision:",
+				...suggestions,
+				"Prefer these over plain text or regex searches for code navigation.",
+			].join("\n"),
+		);
+	}
+
+	function buildProblemsReason(capabilities: ToolCapabilities): string {
+		const suggestedTool = capabilities.hasFileProblems
+			? "`jetbrains_get_file_problems`"
+			: "`*_get_file_problems` (if available)";
+
+		return wrapSystemReminder(
+			[
+				"System Nudge: You have made several file modifications.",
+				`Please use ${suggestedTool} to check edited files for syntax errors or linting issues.`,
+				"This helps identify problems early and ensures the code remains valid.",
+			].join("\n"),
+		);
 	}
 
 	pi.on("session_start", (_event, ctx) => {
 		resetSessionState();
-		if (ctx.hasUI && isProxyOnlyMode()) {
+		if (ctx.hasUI && getToolCapabilities().proxyOnly) {
 			ctx.ui.notify(PROXY_RECONNECT_NOTIFY, "info");
 		}
 	});
@@ -197,28 +319,37 @@ export default function jetbrainsSymbolNudgeExtension(pi: ExtensionAPI): void {
 
 	pi.on("before_agent_start", (event) => {
 		return {
-			systemPrompt: `${event.systemPrompt}\n\n${PROXY_DISCOVERY_HINT}`,
+			systemPrompt: `${event.systemPrompt}\n\n${wrapSystemReminder(buildSystemPromptHint(getToolCapabilities()))}`,
 		};
 	});
 
 	pi.on("tool_call", async (event, ctx) => {
-		if (event.toolName === "bash") {
-			const command = String((event.input as Record<string, unknown>)?.command ?? "");
-			if (/\bmcp\s*\(\s*\{/.test(command)) {
-				return {
-					block: true,
-					reason: "Detected mcp(...) executed via bash. Use the mcp tool directly, not shell syntax.",
-				};
-			}
+		const input = (event.input ?? {}) as Record<string, unknown>;
+		const bashCommand = event.toolName === "bash" ? String(input.command ?? "") : "";
+
+		if (event.toolName === "bash" && /\bmcp\s*\(\s*\{/.test(bashCommand)) {
+			return {
+				block: true,
+				reason: "Detected mcp(...) executed via bash. Use the mcp tool directly, not shell syntax.",
+			};
 		}
 
-		const effectiveToolName = resolveEffectiveToolName(event as { toolName: string; input: Record<string, unknown> });
+		const effectiveToolName = resolveEffectiveToolName({
+			toolName: event.toolName,
+			input,
+		});
+
+		const capabilities = getToolCapabilities();
 
 		if (effectiveToolName.endsWith("get_file_problems")) {
 			writeStreak = 0;
 		} else if (effectiveToolName === "write" || effectiveToolName === "edit") {
 			writeStreak += 1;
-			if (writeStreak >= THRESHOLD && canProblemsNudgeNow()) {
+			if (
+				writeStreak >= PROBLEMS_NUDGE_THRESHOLD
+				&& canProblemsNudgeNow()
+				&& hasProblemsGuidanceTarget(capabilities)
+			) {
 				writeStreak = 0;
 				lastProblemsNudgeAt = Date.now();
 				problemsNudgesSent += 1;
@@ -227,7 +358,7 @@ export default function jetbrainsSymbolNudgeExtension(pi: ExtensionAPI): void {
 					ctx.ui.notify("🧭 Problems nudge: steering model to check edited files", "warning");
 				}
 
-				pi.sendUserMessage(buildProblemsReason(), { deliverAs: "steer" });
+				pi.sendUserMessage(buildProblemsReason(capabilities), { deliverAs: "steer" });
 			}
 		}
 
@@ -238,11 +369,13 @@ export default function jetbrainsSymbolNudgeExtension(pi: ExtensionAPI): void {
 		}
 
 		if (!isGenericTool(effectiveToolName)) return;
+		if (!hasSymbolGuidanceTarget(capabilities)) return;
 
-		genericStreak += 1;
+		const genericToolLabel = describeGenericTool(effectiveToolName, bashCommand);
+		genericStreak += getGenericIncrement(effectiveToolName, bashCommand);
 
 		if (usedSymbolicThisRun) return;
-		if (genericStreak < THRESHOLD) return;
+		if (genericStreak < SEARCH_NUDGE_THRESHOLD) return;
 		if (!canNudgeNow()) return;
 
 		lastNudgeAt = Date.now();
@@ -253,7 +386,7 @@ export default function jetbrainsSymbolNudgeExtension(pi: ExtensionAPI): void {
 			ctx.ui.notify("🧭 Symbol nudge: steering model toward JetBrains symbol tools", "warning");
 		}
 
-		pi.sendUserMessage(buildReason(effectiveToolName), { deliverAs: "steer" });
+		pi.sendUserMessage(buildReason(genericToolLabel, capabilities), { deliverAs: "steer" });
 	});
 
 	const handler = async (args: string, ctx: { ui: { notify: (m: string, t?: "info" | "warning" | "error") => void } }) => {
@@ -269,14 +402,27 @@ export default function jetbrainsSymbolNudgeExtension(pi: ExtensionAPI): void {
 			return;
 		}
 
+		const capabilities = getToolCapabilities();
+		const capabilitiesLine = capabilities.proxyOnly
+			? "capabilities: proxy mode (discover concrete tools via mcp server metadata)"
+			: [
+				`search_symbol=${capabilities.hasSearchSymbol ? "yes" : "no"}`,
+				`symbol_info=${capabilities.hasSymbolInfo ? "yes" : "no"}`,
+				`search_structural=${capabilities.hasStructuralSearch ? "yes" : "no"}`,
+				`structural_patterns=${capabilities.hasStructuralPatterns ? "yes" : "no"}`,
+				`rename_refactoring=${capabilities.hasRenameRefactoring ? "yes" : "no"}`,
+				`get_file_problems=${capabilities.hasFileProblems ? "yes" : "no"}`,
+			].join(", ");
+
 		ctx.ui.notify(
 			[
 				"jetbrains-nudge: always-on (proxy mode aware)",
-				`generic streak: ${genericStreak}/${THRESHOLD}`,
-				`write streak: ${writeStreak}/${THRESHOLD}`,
+				`generic streak: ${genericStreak}/${SEARCH_NUDGE_THRESHOLD}`,
+				`write streak: ${writeStreak}/${PROBLEMS_NUDGE_THRESHOLD}`,
 				`used symbolic this run: ${usedSymbolicThisRun ? "yes" : "no"}`,
 				`symbol nudges sent: ${nudgesSent}`,
 				`problems nudges sent: ${problemsNudgesSent}`,
+				capabilitiesLine,
 			].join("\n"),
 			"info",
 		);
