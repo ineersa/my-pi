@@ -1,0 +1,29 @@
+{
+  "providers": {
+    "llama.cpp": {
+      "baseUrl": "http://127.0.0.1:8052/v1",
+      "api": "openai-completions",
+      "apiKey": "dummy",
+      "compat": {
+        "supportsDeveloperRole": false,
+        "supportsReasoningEffort": false
+      },
+      "models": [
+        {
+          "id": "flash",
+          "name": "flash",
+          "reasoning": false,
+          "input": ["text", "image"],
+          "contextWindow": 200000,
+          "maxTokens": 65536,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        }
+      ]
+    }
+  }
+}

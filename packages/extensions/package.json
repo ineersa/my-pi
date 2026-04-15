@@ -1,0 +1,40 @@
+{
+  "name": "@ineersa/my-pi-extensions",
+  "version": "0.1.1",
+  "description": "Personal extension bundle for pi-coding-agent",
+  "keywords": [
+    "pi-package"
+  ],
+  "license": "MIT",
+  "pi": {
+    "extensions": [
+      "./extensions/safe-guard",
+      "./extensions/bg-process.ts",
+      "./extensions/compact-header.ts",
+      "./extensions/custom-footer.ts",
+      "./extensions/skill-palette",
+      "./extensions/rewind",
+      "./extensions/session-status.ts",
+      "./extensions/usage.ts",
+      "./extensions/pi-mcp-adapter/index.ts",
+      "./extensions/subagents-lite",
+      "./extensions/intercom",
+      "./extensions/custom-compaction"
+    ]
+  },
+  "files": [
+    "extensions",
+    "README.md"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.1",
+    "tsx": "^4.20.0"
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-agent-core": "*",
+    "@mariozechner/pi-ai": "*",
+    "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-tui": "*",
+    "@sinclair/typebox": "*"
+  }
+}

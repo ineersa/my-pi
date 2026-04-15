@@ -1,0 +1,26 @@
+{
+  "name": "my-pi-workspace",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Personal pi extension suite and installer",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "installer:help": "node packages/my-pi/bin/my-pi.mjs --help",
+    "install:local": "node packages/my-pi/bin/my-pi.mjs --source local --local",
+    "remove:local": "node packages/my-pi/bin/my-pi.mjs --source local --local --remove",
+    "install:global": "node packages/my-pi/bin/my-pi.mjs --source local",
+    "theme:list": "node packages/my-pi/bin/theme.mjs list",
+    "theme:set": "node packages/my-pi/bin/theme.mjs set",
+    "copy:settings": "node scripts/copy-settings.mjs",
+    "settings:pull": "node scripts/copy-settings.mjs pull",
+    "settings:push": "node scripts/copy-settings.mjs push",
+    "typecheck": "tsc --noEmit",
+    "publish:all": "npm publish --workspace=@ineersa/my-pi-extensions --access public && npm publish --workspace=@ineersa/my-pi-scheduler --access public && npm publish --workspace=@ineersa/my-pi-themes --access public && npm publish --workspace=@ineersa/my-pi --access public"
+  },
+  "devDependencies": {
+    "@types/node": "^24.5.2",
+    "typescript": "^5.9.2"
+  }
+}

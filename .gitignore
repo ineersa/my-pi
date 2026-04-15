@@ -1,0 +1,17 @@
+node_modules/
+package-lock.json
+npm-debug.log*
+.pnpm-store/
+.idea/*
+
+# pi local runtime files
+.pi/
+
+# tracked global pi bootstrap (never commit auth or runtime)
+pi-settings/**/auth.json
+pi-settings/**/sessions/
+pi-settings/**/intercom/
+pi-settings/**/scheduler/
+
+# misc
+.DS_Store

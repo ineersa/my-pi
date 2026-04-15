@@ -1,0 +1,21 @@
+{
+  "name": "@ineersa/my-pi",
+  "version": "0.1.1",
+  "description": "One-command installer for my pi extension bundle",
+  "keywords": [
+    "pi-package",
+    "pi-coding-agent",
+    "installer"
+  ],
+  "bin": {
+    "my-pi": "bin/my-pi.mjs",
+    "my-pi-theme": "bin/theme.mjs"
+  },
+  "files": [
+    "bin",
+    ".agents",
+    "examples",
+    "README.md"
+  ],
+  "license": "MIT"
+}

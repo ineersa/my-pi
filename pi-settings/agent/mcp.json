@@ -1,0 +1,18 @@
+{
+  "settings": {
+    "toolPrefix": "server",
+    "idleTimeout": 60,
+    "directTools": true
+  },
+  "mcpServers": {
+    "context7": {
+      "url": "https://mcp.context7.com/mcp",
+      "headers": {
+        "CONTEXT7_API_KEY": "${CONTEXT7_API_KEY}"
+      }
+    },
+    "websearch": {
+      "url": "http://127.0.0.1:9001/sse"
+    }
+  }
+}

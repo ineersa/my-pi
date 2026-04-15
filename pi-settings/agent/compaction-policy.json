@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "trigger": {
+    "autoMaxTokens": {
+      "contextWindowThreshold": 200000,
+      "above": 140000,
+      "below": 120000
+    }
+  },
+  "ui": { "name": "ctx", "showStatus": true, "minimalStatus": true },
+  "models": [
+    { "model": "google-gemini-cli/gemini-3-flash-preview" },
+    { "model": "zai/glm-5.1", "thinkingLevel": "low" },
+    { "model": "openai-codex/gpt-5.3-codex", "thinkingLevel": "low" }
+  ]
+}
