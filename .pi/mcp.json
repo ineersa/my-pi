@@ -1,0 +1,14 @@
+{
+  "settings": {
+    "toolPrefix": "server",
+    "directTools": false
+  },
+  "mcpServers": {
+    "jetbrains": {
+      "url": "http://127.0.0.1:64342/sse",
+      "headers": {},
+      "directTools": true,
+      "exposeResources": false
+    }
+  }
+}

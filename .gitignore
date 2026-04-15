@@ -4,9 +4,6 @@ npm-debug.log*
 .pnpm-store/
 .idea/*
 
-# pi local runtime files
-.pi/
-
 # tracked global pi bootstrap (never commit auth or runtime)
 pi-settings/**/auth.json
 pi-settings/**/sessions/
