@@ -655,7 +655,24 @@ async function main() {
 		console.log("  Skipped global pi settings installation.");
 	}
 
-	// ── 2. Install packages (appends to the now-restored settings.json) ────────────
+	// ── 2. Ensure workspace deps when using --source local ──────────────────────
+
+	if (opts.source === "local" && existsSync(join(repoRoot, "package.json"))) {
+		if (!existsSync(join(repoRoot, "node_modules"))) {
+			process.stdout.write("  Installing workspace dependencies (npm install) ... ");
+			try {
+				execFileSync("npm", ["install"], { cwd: repoRoot, stdio: "pipe", timeout: 120_000, shell: IS_WINDOWS });
+				console.log("✓");
+			} catch (err) {
+				console.log(`✗ (${err.stderr?.toString()?.trim() || err.message})`);
+				console.log("  ⚠ Extensions with npm dependencies may not load.");
+			}
+		} else {
+			console.log("  ✓ Workspace node_modules present");
+		}
+	}
+
+	// ── 3. Install packages (appends to the now-restored settings.json) ──────────
 
 	if (installPackages) {
 		for (const pkg of INSTALLER_PACKAGES) {

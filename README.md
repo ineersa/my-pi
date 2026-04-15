@@ -117,6 +117,14 @@ npm run settings:push
 
 During global installer runs (`npx @ineersa/my-pi` or `npm run install:global`), you'll now be prompted to apply bundled `pi-settings` as an optional bootstrap step.
 
+## Copy project settings
+
+Copy the current project's `.pi/` directory to another project:
+
+```bash
+npm run copy:settings -- /path/to/target-project
+```
+
 ## MCP servers (optional)
 
 The repo includes example configs for MCP servers, model providers, and settings. To use them:
@@ -177,6 +185,7 @@ npm run publish:all
 | `npm run theme:set -- <name> --global` | Set global theme |
 | `npm run settings:pull` | Snapshot `~/.pi` into `./pi-settings` (excluding auth) |
 | `npm run settings:push` | Apply `./pi-settings` to `~/.pi` (excluding auth) |
+| `npm run copy:settings -- <dir>` | Copy `.pi/` to another project directory |
 | `npm run publish:all` | Publish all packages to npm |
 
 ## Packages

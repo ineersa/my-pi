@@ -1,11 +1,12 @@
 #!/usr/bin/env node
-import { copyFileSync, existsSync, mkdirSync, readdirSync } from "node:fs";
+import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { homedir } from "node:os";
 
 const mode = process.argv[2] || "pull";
 const repoPiDir = resolve(process.cwd(), "pi-settings");
 const globalPiDir = resolve(homedir(), ".pi");
+const localPiDir = resolve(process.cwd(), ".pi");
 
 const AGENT_FILES = [
 	"compaction-policy.json",
@@ -37,6 +38,27 @@ function copyDirFiltered(src, dest) {
 		}
 	}
 }
+
+// ── Project-local .pi copy (copy:settings <target-dir>) ──────────────
+
+if (mode !== "pull" && mode !== "push") {
+	const targetDir = resolve(process.cwd(), mode);
+
+	if (!existsSync(localPiDir)) {
+		console.error(`Source .pi directory not found: ${localPiDir}`);
+		process.exit(1);
+	}
+
+	const targetPiDir = join(targetDir, ".pi");
+	mkdirSync(targetDir, { recursive: true });
+	rmSync(targetPiDir, { recursive: true, force: true });
+	cpSync(localPiDir, targetPiDir, { recursive: true });
+
+	console.log(`Copied ${localPiDir} -> ${targetPiDir}`);
+	process.exit(0);
+}
+
+// ── Global pi-settings pull/push ──────────────────────────────────────
 
 if (mode === "pull") {
 	let copied = 0;
@@ -73,6 +95,3 @@ if (mode === "push") {
 	console.log(`Pushed ${copied} item(s) from ${repoPiDir}/agent -> ${globalPiDir}/agent`);
 	process.exit(0);
 }
-
-console.error("Usage: npm run copy:settings -- [pull|push]");
-process.exit(1);
