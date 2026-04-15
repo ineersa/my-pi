@@ -465,7 +465,16 @@ function parseSkillDescription(skillDir) {
 }
 
 function copyDirRecursive(src, dest) {
-	cpSync(src, dest, { recursive: true });
+	mkdirSync(dest, { recursive: true });
+	for (const entry of readdirSync(src, { withFileTypes: true })) {
+		const srcPath = join(src, entry.name);
+		const destPath = join(dest, entry.name);
+		if (entry.isDirectory()) {
+			copyDirRecursive(srcPath, destPath);
+		} else if (entry.isFile()) {
+			copyFileSync(srcPath, destPath);
+		}
+	}
 }
 
 function rmDirRecursive(dir) {

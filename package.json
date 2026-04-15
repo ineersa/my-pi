@@ -13,7 +13,6 @@
     "install:global": "node packages/my-pi/bin/my-pi.mjs --source local",
     "theme:list": "node packages/my-pi/bin/theme.mjs list",
     "theme:set": "node packages/my-pi/bin/theme.mjs set",
-    "copy:settings": "node scripts/copy-settings.mjs",
     "settings:pull": "node scripts/copy-settings.mjs pull",
     "settings:push": "node scripts/copy-settings.mjs push",
     "typecheck": "tsc --noEmit",
