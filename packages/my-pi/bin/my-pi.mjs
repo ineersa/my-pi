@@ -646,6 +646,17 @@ async function main() {
 	}
 
 	let failures = 0;
+
+	// ── 1. Restore bundled settings FIRST (before pi install modifies settings.json) ──
+
+	if (!opts.local && installGlobalPiSettings) {
+		installBundledGlobalPiSettings();
+	} else if (!opts.local) {
+		console.log("  Skipped global pi settings installation.");
+	}
+
+	// ── 2. Install packages (appends to the now-restored settings.json) ────────────
+
 	if (installPackages) {
 		for (const pkg of INSTALLER_PACKAGES) {
 			const spec = toInstallSource(pkg, opts);
@@ -770,12 +781,6 @@ async function main() {
 		}
 	} else if (!opts.local) {
 		console.log("  Skipped agents/skills installation.");
-	}
-
-	if (!opts.local && installGlobalPiSettings) {
-		installBundledGlobalPiSettings();
-	} else if (!opts.local) {
-		console.log("  Skipped global pi settings installation.");
 	}
 
 	console.log("\n✅ All done. Restart pi (or /reload) to load updates.");
