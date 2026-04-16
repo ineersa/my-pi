@@ -202,7 +202,8 @@ export function buildProxyDescription(
   desc += "  mcp({ search: \"query\" })              → Search for tools (MCP + pi)\n";
   desc += "  mcp({ describe: \"tool_name\" })        → Show tool details and parameters\n";
   desc += "  mcp({ connect: \"server-name\" })       → Connect to a server and refresh metadata\n";
-  desc += "  mcp({ tool: \"name\", args: '{\"key\": \"value\"}' })    → Call a tool (args is JSON string)\n";
+  desc += "  mcp({ tool: \"name\", args: { key: \"value\" } })         → Call a tool (args as object)\n";
+  desc += "  mcp({ tool: \"name\", args: '{\"key\":\"value\"}' })      → Call a tool (legacy JSON string)\n";
   desc += "\nMode: tool (call) > connect > describe > search > server (list) > nothing (status)";
 
   return desc;

@@ -17,6 +17,7 @@
       "./extensions/session-status.ts",
       "./extensions/usage.ts",
       "./extensions/pi-mcp-adapter/index.ts",
+      "./extensions/jetbrains-index",
       "./extensions/subagents-lite",
       "./extensions/intercom",
       "./extensions/custom-compaction"

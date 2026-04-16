@@ -95,9 +95,10 @@ Create `~/.pi/agent/mcp.json`:
 - `mcp({ search: "query" })` → search tools
 - `mcp({ describe: "tool_name" })` → show schema/details
 - `mcp({ connect: "server-name" })` → connect/reconnect
-- `mcp({ tool: "tool_name", args: "{\"k\":\"v\"}" })` → call tool
+- `mcp({ tool: "tool_name", args: { k: "v" } })` → call tool (preferred)
+- `mcp({ tool: "tool_name", args: "{\"k\":\"v\"}" })` → call tool (legacy)
 
-`args` must be a JSON **string**.
+`args` can be either an object or a JSON string.
 
 ### Commands
 
