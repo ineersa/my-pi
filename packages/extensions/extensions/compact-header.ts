@@ -179,7 +179,7 @@ export default function (pi: ExtensionAPI) {
 					const subagents = getSubagentsHeaderSnapshot(ctx.cwd);
 					lines.push(
 						t(
-							`${pad(d("agents"), lk)}${a(`${subagents.runningAgents} running (${subagents.runningRuns} runs) / ${subagents.availableAgents} available`)} ${d("•")} ${a("Ctrl+Alt+S /subagents-status")}`,
+							`${pad(d("agents"), lk)}${a(`${subagents.runningAgents} running (${subagents.runningRuns} runs) / ${subagents.availableAgents} available`)} ${d("•")} ${a("manage via tmux panes")}`,
 						),
 					);
 					lines.push(

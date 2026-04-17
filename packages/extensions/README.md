@@ -19,7 +19,7 @@ Local dev: `pi install ./packages/extensions -l`
 - **[skill-palette](extensions/skill-palette/README.md)** — `/skill` command palette to queue a skill for the next prompt with fuzzy search + status widget.
 - **[rewind](extensions/rewind/README.md)** — automatic git worktree snapshots at every prompt boundary with exact file restoration during `/fork` and `/tree` navigation.
 - **session-status** — footer status indicator + `/my-pi` command to verify bundle is loaded.
-- **[subagents-lite](extensions/subagents-lite/README.md)** — lean subagent launcher: predefined agents (scout, researcher, etc.), parallel execution (max 4), TUI browser (`/agents`), run history (`/subagents-status`), and LLM-callable `launch_subagents` tool.
+- **[subagents-lite](extensions/subagents-lite/README.md)** — lean subagent launcher: predefined agents (scout, researcher, etc.), parallel execution (max 4), tmux-native run control, and LLM-callable `launch_subagents` tool.
 
 ## Companion packages
 

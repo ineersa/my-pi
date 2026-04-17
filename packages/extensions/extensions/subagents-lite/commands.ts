@@ -1,12 +1,10 @@
 /**
- * Slash commands: /run-agent, /subagents-status
+ * Slash commands: /run-agent
  */
 
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { Key } from "@mariozechner/pi-tui";
 import { discoverAgents } from "./agent-registry.js";
 import { buildSubagentReportMessage } from "./reporting.js";
-import { SubagentsStatusComponent } from "./tui/subagents-status.js";
 
 const DEFAULT_UNNAMED_SESSION_ALIAS_PREFIX = "subagent-chat";
 
@@ -255,7 +253,7 @@ export async function executeAgentLaunch(
 		content:
 			`🚀 Started interactive subagents in tmux (${labels})\n` +
 			`Run: ${runId}\n` +
-			"Started initial task in each pane. Pane auto-closes after a final report is captured. Use /subagents-status to monitor and control.",
+			"Started initial task in each pane. Pane auto-closes after a final report is captured. Manage live runs directly from tmux panes.",
 		display: true,
 	});
 	if (ctx.hasUI) {
@@ -267,26 +265,6 @@ function formatDuration(ms: number): string {
 	if (ms < 1000) return `${ms}ms`;
 	if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
 	return `${Math.floor(ms / 60000)}m${Math.floor((ms % 60000) / 1000)}s`;
-}
-
-async function openSubagentsStatusOverlay(ctx: ExtensionContext): Promise<void> {
-	if (!ctx.hasUI) return;
-	await ctx.ui.custom<void>(
-		(tui, theme, _kb, done) =>
-			new SubagentsStatusComponent(
-				tui,
-				theme,
-				() => done(undefined),
-			),
-		{
-			overlay: true,
-			overlayOptions: {
-				anchor: "center",
-				width: 160,
-				maxHeight: "92%",
-			},
-		},
-	);
 }
 
 export function registerCommands(pi: ExtensionAPI): void {
@@ -317,22 +295,4 @@ export function registerCommands(pi: ExtensionAPI): void {
 			);
 		},
 	});
-
-	pi.registerCommand("subagents-status", {
-		description: "Show active and recent subagent runs",
-		handler: async (_args, ctx) => {
-			await openSubagentsStatusOverlay(ctx);
-		},
-	});
-
-	try {
-		pi.registerShortcut(Key.ctrlAlt("s"), {
-			description: "Open subagents status",
-			handler: async (ctx) => {
-				await openSubagentsStatusOverlay(ctx);
-			},
-		});
-	} catch {
-		// Ignore shortcut registration conflicts so extension still loads.
-	}
 }

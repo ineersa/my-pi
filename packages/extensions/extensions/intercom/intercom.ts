@@ -131,14 +131,14 @@ export default function piIntercomExtension(pi: ExtensionAPI) {
   }
   function waitForReply(from: string, replyTo: string, signal?: AbortSignal): Promise<Message> {
     if (replyWaiter) {
-      return Promise.reject(new Error("Already waiting for a reply"));
+      throw new Error("Already waiting for a reply");
     }
     if (signal?.aborted) {
-      return Promise.reject(new Error("Cancelled"));
+      throw new Error("Cancelled");
     }
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
-        rejectReplyWaiter(new Error(`No reply from "${from}" within 10 minutes`));
+        rejectReplyWaiter(new Error(`No reply from "${from}" within 10 minutes`), replyTo);
       }, 10 * 60 * 1000);
       const cleanup = () => {
         clearTimeout(timeout);
@@ -166,8 +166,14 @@ export default function piIntercomExtension(pi: ExtensionAPI) {
       };
     });
   }
-  function rejectReplyWaiter(error: Error): void {
-    replyWaiter?.reject(error);
+  function rejectReplyWaiter(error: Error, replyTo?: string): void {
+    if (!replyWaiter) {
+      return;
+    }
+    if (replyTo && replyWaiter.replyTo !== replyTo) {
+      return;
+    }
+    replyWaiter.reject(error);
   }
   function clearReconnectTimer(): void {
     if (!reconnectTimer) {
@@ -692,6 +698,7 @@ Usage:
             };
           }
           let replyPromise: Promise<Message> | null = null;
+          let questionId: string | null = null;
 
           try {
             const sendTo = await resolveSessionTarget(connectedClient, to) ?? to;
@@ -701,8 +708,12 @@ Usage:
                 isError: true,
               };
             }
-            const questionId = randomUUID();
+            questionId = randomUUID();
             replyPromise = waitForReply(sendTo, questionId, _signal);
+            // Attach a handler immediately so strict unhandled-rejection mode cannot crash the process
+            // if the waiter rejects before we reach the explicit await below.
+            void replyPromise.catch(() => {});
+
             const sendResult = await connectedClient.send(sendTo, {
               messageId: questionId,
               text: message,
@@ -712,7 +723,7 @@ Usage:
 
             if (!sendResult.delivered) {
               const errorText = sendResult.reason ?? "Session may not exist or has disconnected.";
-              rejectReplyWaiter(new Error(`Message to "${to}" was not delivered: ${errorText}`));
+              rejectReplyWaiter(new Error(`Message to "${to}" was not delivered: ${errorText}`), questionId);
               if (replyPromise) {
                 try {
                   await replyPromise;
@@ -747,7 +758,9 @@ Usage:
               isError: false,
             };
           } catch (error) {
-            rejectReplyWaiter(toError(error));
+            if (questionId) {
+              rejectReplyWaiter(toError(error), questionId);
+            }
             if (replyPromise) {
               try {
                 await replyPromise;

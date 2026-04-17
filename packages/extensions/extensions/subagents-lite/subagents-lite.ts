@@ -4,7 +4,7 @@
  * Features:
  * - Predefined agents (scout, researcher, etc.) loaded from .md files
  * - Parallel launch of up to 4 subagents
- * - Run history + status overlay (/subagents-status)
+ * - Run history persisted for runtime coordination
  * - LLM-callable tool: launch_subagents
  */
 
@@ -97,11 +97,8 @@ function extractMessageText(message: unknown): string {
 	return parts.join("\n").trim();
 }
 
-function compactReport(text: string, maxLen: number = 1800): string {
-	const trimmed = text.trim();
-	if (!trimmed) return "";
-	if (trimmed.length <= maxLen) return trimmed;
-	return `${trimmed.slice(0, maxLen - 3)}...`;
+function compactReport(text: string): string {
+	return text.trim();
 }
 
 const INTERCOM_READY_EVENT = "pi-intercom:ready";
@@ -480,7 +477,7 @@ export default function subagentsLiteExtension(pi: ExtensionAPI): void {
 						text:
 							`🚀 Started interactive subagents in tmux (${labels})\n` +
 							`Run: ${runId}\n` +
-							"Started initial task in each pane. Pane auto-closes after a final report is captured. Use /subagents-status to monitor and control.",
+							"Started initial task in each pane. Pane auto-closes after a final report is captured. Manage live runs directly from tmux panes.",
 					},
 				],
 				details: {},

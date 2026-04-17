@@ -12,20 +12,14 @@ A lean subagent extension for [pi-coding-agent](https://github.com/badlogic/pi-m
   - child turn completion sends a structured intercom event to the parent session; parent updates run status immediately, even while tmux panes remain open.
   - intercom is required for subagent parent/child communication and is shipped in this extension bundle.
 - **Parallel launch** — run up to 4 subagents concurrently, including duplicates (e.g., 3 scouts).
-- **Status overlay** — `/subagents-status` shows active and recent runs, supports pane jump + control.
-  - includes per-step skill diagnostics (`cfg / ok / missing`) for quick debugging.
-  - jump into a running pane with `enter`/`j` from status (`r` toggle full report, `k` interrupt, `shift+k` kill pane, `m` mark done, `esc` close).
+- **tmux-native control** — active runs are managed directly in tmux panes (attach, interrupt, kill).
 - **LLM tool** — `launch_subagents` tool callable by the model.
   - completion reports are rendered as expandable custom messages (click to expand full subagent replies).
 - **Startup inventory** — on session start, shows where agents were loaded from and warns about name conflicts (which source won).
 
 ## Commands
 
-| Command | Description |
-|---|---|
-| `/run-agent <name> -- <task>` | Launch a single interactive tmux subagent |
-| `/subagents-status` | Show active + recent run history |
-| `Ctrl+Alt+S` | Open subagents status overlay |
+- `/run-agent <name> -- <task>` — Launch a single interactive tmux subagent
 
 ## Tool: `launch_subagents`
 
@@ -55,14 +49,12 @@ System prompt body goes here.
 
 ### Frontmatter fields
 
-| Field | Required | Description |
-|---|---|---|
-| `name` | Yes | Unique agent name |
-| `description` | Yes | Short description |
-| `model` | No | Model to use (e.g., `anthropic/claude-haiku-4-5`) |
-| `tools` | No | Comma-separated tool list (supports `mcp:*`, `mcp:<server>`, `mcp:<server>/<tool>`) |
-| `skills` or `skill` | No | Comma-separated skill names (resolved with project/user + package/settings fallback, injected into prompt) |
-| `thinking` | No | Thinking level (off, minimal, low, medium, high, xhigh) |
+- `name` (required) — Unique agent name
+- `description` (required) — Short description
+- `model` (optional) — Model to use (e.g., `anthropic/claude-haiku-4-5`)
+- `tools` (optional) — Comma-separated tool list (supports `mcp:*`, `mcp:<server>`, `mcp:<server>/<tool>`)
+- `skills` or `skill` (optional) — Comma-separated skill names (resolved with project/user + package/settings fallback, injected into prompt)
+- `thinking` (optional) — Thinking level (off, minimal, low, medium, high, xhigh)
 
 Body markdown = system prompt for the child process.
 
