@@ -1,12 +1,12 @@
 # Project Overview
 
 my-pi is a personal extension suite and one-command installer for
-[pi-coding-agent](https://github.com/badlogic/pi-mono). It ships three npm
-packages — an extension bundle (safe-guard + rewind + session-status), a standalone
-scheduler extension, and an installer CLI — that add permission gates,
-scheduled follow-ups, and a status indicator to any pi session. The monorepo
-uses npm workspaces, raw TypeScript extensions loaded directly by pi, and zero
-build step.
+[pi-coding-agent](https://github.com/badlogic/pi-mono). It ships five npm
+packages — an extension bundle, a standalone scheduler extension, a standalone
+JetBrains index diagnostics extension, a theme pack, and an installer CLI — that
+add permission gates, scheduled follow-ups, IDE diagnostics guardrails, and a
+status indicator to any pi session. The monorepo uses npm workspaces, raw
+TypeScript extensions loaded directly by pi, and zero build step.
 
 ## Repository Structure
 
@@ -15,6 +15,9 @@ build step.
 - `packages/scheduler/` — standalone scheduler extension
   (`@ineersa/my-pi-scheduler`): recurring checks, reminders, `schedule_prompt`
   tool; depends on `croner`
+- `packages/jetbrains-index/` — standalone JetBrains index diagnostics gate
+  (`@ineersa/my-pi-jetbrains-index`): IDE-first tool guidance, edit/write guard,
+  and post-write diagnostics sync
 - `packages/themes/` — curated theme pack (`@ineersa/my-pi-themes`):
   cyberpunk, nord, gruvbox, tokyo-night, catppuccin, oh-pi-dark
 - `packages/my-pi/` — installer CLI (`@ineersa/my-pi`) that registers all
@@ -96,7 +99,7 @@ cd /tmp && pi
 ### Publishing updates
 
 ```bash
-npm version patch -w @ineersa/my-pi-extensions -w @ineersa/my-pi-scheduler -w @ineersa/my-pi-themes -w @ineersa/my-pi
+npm version patch -w @ineersa/my-pi-extensions -w @ineersa/my-pi-scheduler -w @ineersa/my-pi-jetbrains-index -w @ineersa/my-pi-themes -w @ineersa/my-pi
 npm run publish:all
 ```
 
@@ -152,6 +155,9 @@ npm run publish:all
   `~/.pi/agent/scheduler/<workspace>/scheduler.json`, dispatches prompts via
   `pi.sendUserMessage()` when idle, and manages multi-instance ownership
   through lease files
+- **jetbrains-index** injects IDE-first semantic tool guidance, blocks
+  `edit`/`write` while JetBrains indexing is in dumb mode, and reports new
+  diagnostics after successful file mutations
 
 ## Testing Strategy
 
@@ -210,6 +216,25 @@ npm run publish:all
 - **pi event bus:** extensions can emit custom events via `pi.events.on()`
   (e.g., `oh-pi:safe-mode`)
 
+## Tool Preferences
+
+When working with this codebase:
+
+- **Prefer JetBrains IDE index MCP tools** (`jetbrains_index_ide_*`) for semantic code operations:
+  - Finding usages/references: use `jetbrains_index_ide_find_references` instead of grep
+  - Going to definition: use `jetbrains_index_ide_find_definition` instead of text search
+  - Finding classes/files: use `jetbrains_index_ide_find_class` and `jetbrains_index_ide_find_file`
+  - Searching exact words: use `jetbrains_index_ide_search_text` (use grep only for regex)
+  - Renaming symbols: use `jetbrains_index_ide_refactor_rename` instead of edit/sed replacements
+  - Moving code files: use `jetbrains_index_ide_move_file` instead of `mv`/`git mv`
+  - Hierarchy/call flow: use `jetbrains_index_ide_type_hierarchy`, `jetbrains_index_ide_call_hierarchy`, `jetbrains_index_ide_find_implementations`, `jetbrains_index_ide_find_super_methods`
+  - Diagnostics/index/sync: use `jetbrains_index_ide_diagnostics`, `jetbrains_index_ide_index_status`, `jetbrains_index_ide_sync_files`
+- If IDE tools fail unexpectedly or results seem incomplete, check `jetbrains_index_ide_index_status`
+- After creating/modifying files with `edit`/`write`, run `jetbrains_index_ide_sync_files` on changed paths before retrying IDE queries
+- Use project-relative file paths and 1-based `line`/`column` for IDE tool calls
+- These tools are faster, more context-efficient, and better integrated with the IDE than the default tools
+- Only fall back to default tools when IDE tools do not support the needed operation (e.g., regex search)
+
 ## Further Reading
 
 - [Root README](README.md) — quick start and project layout
@@ -221,5 +246,7 @@ npm run publish:all
   file snapshots, restore options, retention, configuration
 - [Scheduler README](packages/scheduler/README.md) — commands, tool API,
   ownership model, limits
+- [JetBrains Index README](packages/jetbrains-index/README.md) — diagnostics
+  gate behavior and package usage
 - [Installer README](packages/my-pi/README.md) — CLI options and package
   table

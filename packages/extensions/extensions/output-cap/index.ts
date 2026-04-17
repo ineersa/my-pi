@@ -7,7 +7,7 @@ import { randomBytes } from "node:crypto";
 
 // ─── config ─────────────────────────────────────────────────────────────
 
-const MAX_CHARS = 10_000; // ~2,500 tokens
+const MAX_CHARS = 20_000; // ~5000 tokens
 const MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
 
 // ─── temp file helpers ──────────────────────────────────────────────────

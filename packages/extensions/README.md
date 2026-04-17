@@ -19,12 +19,12 @@ Local dev: `pi install ./packages/extensions -l`
 - **[skill-palette](extensions/skill-palette/README.md)** — `/skill` command palette to queue a skill for the next prompt with fuzzy search + status widget.
 - **[rewind](extensions/rewind/README.md)** — automatic git worktree snapshots at every prompt boundary with exact file restoration during `/fork` and `/tree` navigation.
 - **session-status** — footer status indicator + `/my-pi` command to verify bundle is loaded.
-- **jetbrains-index** — JetBrains index diagnostics gate: blocks `edit`/`write` while IDE index is in dumb mode (3 retries × 5s), syncs changed files via `ide_sync_files`, and injects newly introduced diagnostics after successful edits/writes (enabled only when `.idea/` exists in CWD and `mcpServers.jetbrains-index` is reachable).
 - **[subagents-lite](extensions/subagents-lite/README.md)** — lean subagent launcher: predefined agents (scout, researcher, etc.), parallel execution (max 4), TUI browser (`/agents`), run history (`/subagents-status`), and LLM-callable `launch_subagents` tool.
 
 ## Companion packages
 
 - **[@ineersa/my-pi-scheduler](../scheduler/README.md)** — recurring checks, one-time reminders, and the LLM-callable `schedule_prompt` tool. Installs separately for projects that need scheduled follow-ups.
+- **[@ineersa/my-pi-jetbrains-index](../jetbrains-index/README.md)** — standalone JetBrains index diagnostics gate extension with IDE-first guardrails and diagnostics sync.
 - **[@ineersa/my-pi-themes](../themes/README.md)** — curated theme pack (catppuccin-mocha, cyberpunk, gruvbox-dark, nord, oh-p-dark, tokyo-night).
 
 ## Add a new extension

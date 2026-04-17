@@ -161,6 +161,7 @@ export default function jetbrainsIndexExtension(pi: ExtensionAPI): void {
 	globalState[SINGLETON_KEY] = ownerToken;
 
 	let extensionEnabled = false;
+	let indexDisabledForSession = false;
 	let uiNotify: ((message: string, level: "info" | "warning" | "error") => void) | null = null;
 	let unboundedReadCountThisTurn = 0;
 	let unboundedReadWarningSentThisTurn = false;
@@ -205,6 +206,16 @@ export default function jetbrainsIndexExtension(pi: ExtensionAPI): void {
 		}
 	}
 
+	function disableForSession(reason: string): void {
+		if (indexDisabledForSession) {
+			return;
+		}
+		indexDisabledForSession = true;
+		extensionEnabled = false;
+		uiNotify?.(`⚠️ JetBrains index disabled for this session: ${reason}`, "warning");
+		uiNotify?.("ℹ️ Edit/write will proceed without index checks or diagnostics.", "info");
+	}
+
 	function notifyIndexBlock(ctx: { hasUI: boolean; ui: { notify: (m: string, l: "info" | "warning" | "error") => void } }, reason: string): void {
 		if (!ctx.hasUI) {
 			return;
@@ -214,6 +225,7 @@ export default function jetbrainsIndexExtension(pi: ExtensionAPI): void {
 
 	pi.on("session_start", async (_event, ctx) => {
 		tracker.reset();
+		indexDisabledForSession = false;
 		unboundedReadCountThisTurn = 0;
 		unboundedReadWarningSentThisTurn = false;
 		consecutiveLargeReadCountThisTurn = 0;
@@ -224,22 +236,22 @@ export default function jetbrainsIndexExtension(pi: ExtensionAPI): void {
 		}
 
 		const connected = await refreshExtensionEnabled(ctx.cwd);
-		sessionStartNudgePending = connected;
-		if (!ctx.hasUI) {
+		if (!connected) {
+			const disableReason = tracker.getStatus().lastError ?? "requirements not satisfied";
+			disableForSession(disableReason);
 			return;
 		}
 
-		if (connected) {
+		sessionStartNudgePending = true;
+		if (ctx.hasUI) {
 			ctx.ui.notify("🔍 JetBrains index diagnostics gate enabled", "info");
-		} else {
-			const disableReason = tracker.getStatus().lastError ?? "requirements not satisfied";
-			ctx.ui.notify(`ℹ️ JetBrains index diagnostics gate disabled: ${disableReason}`, "info");
 		}
 	});
 
 	pi.on("session_shutdown", async () => {
 		await tracker.shutdown();
 		extensionEnabled = false;
+		indexDisabledForSession = false;
 		sessionStartNudgePending = false;
 		nonSymbolicStreakCountThisTurn = 0;
 		uiNotify = null;
@@ -256,11 +268,20 @@ export default function jetbrainsIndexExtension(pi: ExtensionAPI): void {
 		consecutiveLargeReadCountThisTurn = 0;
 		nearReadBlockWarningSentThisTurn = false;
 		nonSymbolicStreakCountThisTurn = 0;
+
+		if (indexDisabledForSession) {
+			return;
+		}
+
 		await refreshExtensionEnabled(ctx.cwd);
+		if (!extensionEnabled) {
+			const disableReason = tracker.getStatus().lastError ?? "requirements not satisfied";
+			disableForSession(disableReason);
+		}
 	});
 
 	pi.on("before_agent_start", (event) => {
-		if (!extensionEnabled) {
+		if (!extensionEnabled || indexDisabledForSession) {
 			return;
 		}
 
@@ -281,7 +302,7 @@ export default function jetbrainsIndexExtension(pi: ExtensionAPI): void {
 	});
 
 	pi.on("tool_call", async (event, ctx) => {
-		if (!extensionEnabled) {
+		if (!extensionEnabled || indexDisabledForSession) {
 			return;
 		}
 
@@ -356,24 +377,24 @@ export default function jetbrainsIndexExtension(pi: ExtensionAPI): void {
 			}
 
 			const reason = beforeMutation.reason ?? "IDE index is not ready after retries.";
-			notifyIndexBlock(ctx, reason);
+			disableForSession(reason);
 			return {
 				block: true,
-				reason,
+				reason: `${reason} Extension disabled for this session — subsequent edits will proceed without index checks.`,
 			};
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			const reason = `Diagnostics preflight failed: ${message}`;
-			notifyIndexBlock(ctx, reason);
+			disableForSession(reason);
 			return {
 				block: true,
-				reason,
+				reason: `${reason} Extension disabled for this session — subsequent edits will proceed without index checks.`,
 			};
 		}
 	});
 
 	pi.on("tool_result", async (event, ctx) => {
-		if (!extensionEnabled) {
+		if (!extensionEnabled || indexDisabledForSession) {
 			return;
 		}
 

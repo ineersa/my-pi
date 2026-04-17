@@ -47,7 +47,7 @@ export const LARGE_READ_LINE_THRESHOLD = 200;
 export const LARGE_READ_CONSECUTIVE_BLOCK_THRESHOLD = 4;
 
 /** Block mixed non-symbolic exploration bursts after this many weighted calls. */
-export const NON_SYMBOLIC_STREAK_BLOCK_THRESHOLD = 4;
+export const NON_SYMBOLIC_STREAK_BLOCK_THRESHOLD = 6;
 
 /** Minimum cooldown between mixed non-symbolic deny actions. */
 export const NON_SYMBOLIC_DENY_COOLDOWN_MS = 120 * 1000;

@@ -39,4 +39,5 @@ npx @ineersa/my-pi --source local
 |---------|-------------|
 | `@ineersa/my-pi-extensions` | Extension bundle (safe-guard, session-status) |
 | `@ineersa/my-pi-scheduler` | Scheduler extension (recurring checks, reminders, `schedule_prompt` tool) |
+| `@ineersa/my-pi-jetbrains-index` | JetBrains index diagnostics gate extension (IDE-first guardrails + diagnostics sync) |
 | `@ineersa/my-pi-themes` | Theme pack (catppuccin-mocha, cyberpunk, gruvbox-dark, nord, oh-p-dark, tokyo-night) |

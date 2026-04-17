@@ -14,8 +14,9 @@ Running `npx @ineersa/my-pi` registers the following packages globally in `~/.pi
 
 | Package | What it adds |
 |---------|-------------|
-| `@ineersa/my-pi-extensions` | safe-guard, bg-process, compact-header, custom-footer, skill-palette, rewind, session-status, usage, pi-mcp-adapter, jetbrains-index, subagents-lite |
+| `@ineersa/my-pi-extensions` | safe-guard, bg-process, compact-header, custom-footer, skill-palette, rewind, session-status, usage, pi-mcp-adapter, subagents-lite |
 | `@ineersa/my-pi-scheduler` | Recurring checks, one-time reminders, `schedule_prompt` tool |
+| `@ineersa/my-pi-jetbrains-index` | Standalone JetBrains index diagnostics gate (IDE-first guardrails + diagnostics sync) |
 | `@ineersa/my-pi-themes` | Theme pack: catppuccin-mocha, cyberpunk, gruvbox-dark, nord, oh-p-dark, tokyo-night |
 
 It also:
@@ -65,10 +66,11 @@ npx @ineersa/my-pi --remove
 
 ```text
 packages/
-  extensions/   # extension bundle (safe-guard, bg-process, rewind, session-status, jetbrains-index, ...)
-  scheduler/    # standalone scheduler extension
-  themes/       # curated pi themes
-  my-pi/        # installer CLI
+  extensions/      # extension bundle (safe-guard, bg-process, rewind, session-status, ...)
+  scheduler/       # standalone scheduler extension
+  jetbrains-index/ # standalone jetbrains-index extension
+  themes/          # curated pi themes
+  my-pi/           # installer CLI
 ```
 
 ## Themes
@@ -168,7 +170,7 @@ Edit `~/.pi/agent/mcp.json` to add/remove MCP servers.
 Bump versions and publish all packages:
 
 ```bash
-npm version patch -w @ineersa/my-pi-extensions -w @ineersa/my-pi-scheduler -w @ineersa/my-pi-themes -w @ineersa/my-pi
+npm version patch -w @ineersa/my-pi-extensions -w @ineersa/my-pi-scheduler -w @ineersa/my-pi-jetbrains-index -w @ineersa/my-pi-themes -w @ineersa/my-pi
 npm run publish:all
 ```
 
@@ -192,7 +194,8 @@ npm run publish:all
 
 | Package | Description |
 |---------|-------------|
-| `@ineersa/my-pi-extensions` | Extension bundle: safe-guard, bg-process, compact-header, custom-footer, skill-palette, session-status, rewind, usage, pi-mcp-adapter, jetbrains-index, subagents-lite |
+| `@ineersa/my-pi-extensions` | Extension bundle: safe-guard, bg-process, compact-header, custom-footer, skill-palette, session-status, rewind, usage, pi-mcp-adapter, subagents-lite |
 | `@ineersa/my-pi-scheduler` | Standalone scheduler: recurring checks, one-time reminders, `schedule_prompt` tool |
+| `@ineersa/my-pi-jetbrains-index` | Standalone JetBrains index diagnostics gate (IDE-first guardrails + diagnostics sync) |
 | `@ineersa/my-pi-themes` | Curated theme pack: catppuccin-mocha, cyberpunk, gruvbox-dark, nord, oh-p-dark, tokyo-night |
 | `@ineersa/my-pi` | One-command installer for all packages |
