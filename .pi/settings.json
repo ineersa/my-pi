@@ -1,8 +1,4 @@
 {
-  "packages": [
-    "../packages/extensions",
-    "../packages/scheduler",
-    "../packages/themes"
-  ],
+  "packages": [],
   "theme": "cyberpunk"
 }

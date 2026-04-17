@@ -10,8 +10,14 @@ export const SYMBOLIC_SUFFIXES = new Set<string>([
 ]);
 
 export const SEARCH_NUDGE_THRESHOLD = 3;
-export const COOLDOWN_MS = 2 * 60 * 1000;
+export const COOLDOWN_MS = 5 * 60 * 1000;
 export const SEARCH_BASH_REGEX = /\b(?:rg|grep|git\s+grep|find)\b/i;
+
+/** Detect shell move commands to nudge toward IDE move refactoring. */
+export const MOVE_BASH_REGEX = /(^|[;&|]\s*|\s+)(?:git\s+mv|mv)(?=\s|$)/i;
+
+/** Cooldown for repeated read/move nudges to avoid reminder spam. */
+export const NUDGE_COOLDOWN_MS = 5 * 60 * 1000;
 
 /** Timeout for a single MCP tool call (e.g. get_file_problems). */
 export const MCP_TOOL_CALL_TIMEOUT_MS = 30_000;
@@ -33,6 +39,21 @@ export const IDE_INDEX_STATUS_MAX_RETRIES = 3;
 
 /** Delay between index readiness retries. */
 export const IDE_INDEX_STATUS_RETRY_DELAY_MS = 5_000;
+
+/** Consider reads above this many lines as large for read-efficiency enforcement. */
+export const LARGE_READ_LINE_THRESHOLD = 200;
+
+/** Block unbounded reads once this many consecutive large reads occur in a turn. */
+export const LARGE_READ_CONSECUTIVE_BLOCK_THRESHOLD = 4;
+
+/** Block mixed non-symbolic exploration bursts after this many weighted calls. */
+export const NON_SYMBOLIC_STREAK_BLOCK_THRESHOLD = 4;
+
+/** Minimum cooldown between mixed non-symbolic deny actions. */
+export const NON_SYMBOLIC_DENY_COOLDOWN_MS = 120 * 1000;
+
+/** Unbounded reads count heavier in mixed non-symbolic streak tracking. */
+export const NON_SYMBOLIC_UNBOUNDED_READ_INCREMENT = 2;
 
 export const PROXY_DISCOVERY_WORKFLOW = [
 	"JetBrains MCP is running in proxy mode via the mcp tool.",
