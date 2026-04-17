@@ -11,6 +11,8 @@
     "install:local": "node packages/my-pi/bin/my-pi.mjs --source local --local",
     "remove:local": "node packages/my-pi/bin/my-pi.mjs --source local --local --remove",
     "install:global": "node packages/my-pi/bin/my-pi.mjs --source local",
+    "remove:global": "node packages/my-pi/bin/my-pi.mjs --remove",
+    "remove:global:local": "node packages/my-pi/bin/my-pi.mjs --remove --source local",
     "theme:list": "node packages/my-pi/bin/theme.mjs list",
     "theme:set": "node packages/my-pi/bin/theme.mjs set",
     "copy:settings": "node scripts/copy-settings.mjs",

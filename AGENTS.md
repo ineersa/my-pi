@@ -1,220 +1,120 @@
-# Project Overview
+# AGENTS.md
 
-my-pi is a personal extension suite and one-command installer for
-[pi-coding-agent](https://github.com/badlogic/pi-mono). It ships five npm
-packages — an extension bundle, a standalone scheduler extension, a standalone
-JetBrains index diagnostics extension, a theme pack, and an installer CLI — that
-add permission gates, scheduled follow-ups, IDE diagnostics guardrails, and a
-status indicator to any pi session. The monorepo uses npm workspaces, raw
-TypeScript extensions loaded directly by pi, and zero build step.
+## Description
 
-## Repository Structure
+`my-pi` is a monorepo for a personal extension suite and installer for
+[pi-coding-agent](https://github.com/badlogic/pi-mono). It provides five npm
+packages: extension bundle, scheduler, JetBrains index guard, themes, and a
+one-command installer. Runtime is zero-build: pi loads raw TypeScript files.
 
-- `packages/extensions/` — pi extension bundle (`@ineersa/my-pi-extensions`)
-  with safe-guard (permission gate), rewind (file checkpoints), and session-status (footer widget)
-- `packages/scheduler/` — standalone scheduler extension
-  (`@ineersa/my-pi-scheduler`): recurring checks, reminders, `schedule_prompt`
-  tool; depends on `croner`
-- `packages/jetbrains-index/` — standalone JetBrains index diagnostics gate
-  (`@ineersa/my-pi-jetbrains-index`): IDE-first tool guidance, edit/write guard,
-  and post-write diagnostics sync
-- `packages/themes/` — curated theme pack (`@ineersa/my-pi-themes`):
-  cyberpunk, nord, gruvbox, tokyo-night, catppuccin, oh-pi-dark
-- `packages/my-pi/` — installer CLI (`@ineersa/my-pi`) that registers all
-  packages with `pi install` in one command; also sets theme and deploys
-  safe-guard policy globally
-- `.pi/` — project-local pi settings (settings.json, safe-guard policy);
-  git-ignored
-- `~/.pi/agent/` — global pi settings (settings.json, safe-guard policy,
-  scheduler storage, auth)
-- `tsconfig.json` — strict TypeScript config covering all packages; test files
-  excluded
+## Repository Structure Overview
 
-## Build & Development Commands
+- `packages/extensions/` — bundled extensions (`safe-guard`, `rewind`, `session-status`)
+- `packages/scheduler/` — standalone scheduler (`schedule_prompt`, recurring checks)
+- `packages/jetbrains-index/` — IDE-index-aware diagnostics/edit guard extension
+- `packages/themes/` — curated theme pack
+- `packages/my-pi/` — installer CLI that registers all packages
+- `.pi/` — local project pi config (git-ignored)
+- `~/.pi/agent/` — global pi config, scheduler storage, policy files
+- `tsconfig.json` — strict typecheck config for workspaces
+
+## Architecture Brief
+
+Core runtime model:
+- pi loads extension entrypoints directly from package paths (no build output).
+- Installer writes extension registrations into either project-local `.pi/settings.json`
+  (local dev) or global `~/.pi/agent/settings.json` (published/global mode).
+- Local and global installs must not be active together to avoid duplicate tools/hooks.
+
+Package responsibilities:
+- `packages/my-pi` (installer CLI): registers/removes package extensions,
+  supports one-command bootstrap, and deploys default safe-guard policy.
+- `packages/extensions` (bundle):
+  - `safe-guard`: policy-driven command/file safety gate (`allow/ask/block`).
+  - `bg-process`: long-running bash backgrounding + per-session process cleanup.
+  - `compact-header`: compact header with MCP/subagent-aware runtime indicators.
+  - `custom-footer`: rich footer (model/usage/git/PR probe) with throttled probes.
+  - `skill-palette`: discovers skills/themes and renders skill-context UI.
+  - `rewind`: git-based checkpoint snapshots + deterministic restore flows.
+  - `session-status`: minimal session lifecycle status utility.
+  - `usage`: provider usage/rate-limit probe with timeout + graceful degradation.
+  - `pi-mcp-adapter`: MCP lifecycle/proxy/direct-tools bridge from `mcp.json`.
+  - `subagents-lite`: local subagent orchestration + parent-child intercom hooks.
+  - `intercom`: broker-backed local session messaging + queued reconnect handling.
+  - `custom-compaction`: policy-based compaction profiles and summary templates.
+  - `output-cap`: captures large tool outputs to files and avoids response bloat.
+- `packages/scheduler` (standalone): `schedule_prompt`, natural-language schedules,
+  persisted tasks, idle dispatch, and multi-instance ownership/lease coordination.
+- `packages/jetbrains-index` (standalone): IDE-first guidance, dumb-mode edit/write
+  blocking, changed-path sync, and post-mutation diagnostics.
+- `packages/themes`: curated presentation-only themes, independent from extension runtime.
+
+### Extension docs map
+
+| Extension | Docs |
+| --- | --- |
+| safe-guard | [settings](packages/extensions/docs/extensions/safe-guard/settings.md) · [maintenance](packages/extensions/docs/extensions/safe-guard/maintenance.md) |
+| bg-process | [settings](packages/extensions/docs/extensions/bg-process/settings.md) · [maintenance](packages/extensions/docs/extensions/bg-process/maintenance.md) |
+| compact-header | [settings](packages/extensions/docs/extensions/compact-header/settings.md) · [maintenance](packages/extensions/docs/extensions/compact-header/maintenance.md) |
+| custom-footer | [settings](packages/extensions/docs/extensions/custom-footer/settings.md) · [maintenance](packages/extensions/docs/extensions/custom-footer/maintenance.md) |
+| skill-palette | [settings](packages/extensions/docs/extensions/skill-palette/settings.md) · [maintenance](packages/extensions/docs/extensions/skill-palette/maintenance.md) |
+| rewind | [settings](packages/extensions/docs/extensions/rewind/settings.md) · [maintenance](packages/extensions/docs/extensions/rewind/maintenance.md) |
+| session-status | [settings](packages/extensions/docs/extensions/session-status/settings.md) · [maintenance](packages/extensions/docs/extensions/session-status/maintenance.md) |
+| usage | [settings](packages/extensions/docs/extensions/usage/settings.md) · [maintenance](packages/extensions/docs/extensions/usage/maintenance.md) |
+| pi-mcp-adapter | [settings](packages/extensions/docs/extensions/pi-mcp-adapter/settings.md) · [maintenance](packages/extensions/docs/extensions/pi-mcp-adapter/maintenance.md) |
+| subagents-lite | [settings](packages/extensions/docs/extensions/subagents-lite/settings.md) · [maintenance](packages/extensions/docs/extensions/subagents-lite/maintenance.md) |
+| intercom | [settings](packages/extensions/docs/extensions/intercom/settings.md) · [maintenance](packages/extensions/docs/extensions/intercom/maintenance.md) |
+| custom-compaction | [settings](packages/extensions/docs/extensions/custom-compaction/settings.md) · [maintenance](packages/extensions/docs/extensions/custom-compaction/maintenance.md) |
+| output-cap | [settings](packages/extensions/docs/extensions/output-cap/settings.md) · [maintenance](packages/extensions/docs/extensions/output-cap/maintenance.md) |
+| scheduler | [settings](packages/scheduler/docs/extensions/scheduler/settings.md) · [maintenance](packages/scheduler/docs/extensions/scheduler/maintenance.md) |
+| schedule_prompt (tool) | [settings](packages/scheduler/docs/tools/schedule_prompt/settings.md) · [maintenance](packages/scheduler/docs/tools/schedule_prompt/maintenance.md) |
+| jetbrains-index | [settings](packages/jetbrains-index/docs/extensions/jetbrains-index/settings.md) · [maintenance](packages/jetbrains-index/docs/extensions/jetbrains-index/maintenance.md) |
+
+## How to Run Things
 
 ```bash
-# install all workspace dependencies
+# install deps
 npm install
 
-# type-check every package (no emit)
+# typecheck all packages (no emit)
 npm run typecheck
 
-# install extensions into this project's .pi/settings.json (local dev)
+# local dev: install local workspace extensions into .pi/settings.json
 npm run install:local
 
-# remove local extensions from .pi/settings.json
+# remove local registration
 npm run remove:local
 
-# install from local workspace paths globally (dev testing before publish)
+# test workspace packages as global install
 npm run install:global
 
 # installer help
 npm run installer:help
 
-# start pi in this repo (requires global pi)
+# start pi in this repo
 pi
 ```
 
-There is no build, lint, or deploy step — pi loads raw `.ts` extension files
-at runtime. TypeScript is used only for type-checking.
+Local dev flow:
+1. `npx @ineersa/my-pi --remove` (clear global install)
+2. `npm run install:local`
+3. run `pi` and `/reload` after extension edits
 
-## Local Development Workflow
+## Rules
 
-Extensions can be loaded **locally** (workspace paths in `.pi/settings.json`) or
-**globally** (published npm packages in `~/.pi/agent/settings.json`). Never have
-both active at the same time — pi loads both and conflicts on tools/flags.
-
-### Working in this repo (local dev)
-
-```bash
-# Remove any global installs first
-npx @ineersa/my-pi --remove
-
-# Register local workspace paths in .pi/settings.json
-npm run install:local
-
-# Start pi — edits to extensions/ are live after /reload
-pi
-```
-
-### Working anywhere else (global install)
-
-```bash
-# Install published packages globally
-npx @ineersa/my-pi
-
-# Make sure no project has .pi/settings.json with local paths
-```
-
-### Testing a local change globally (before publishing)
-
-```bash
-# Install from workspace paths into global settings
-npm run install:global
-
-# Test in any directory
-cd /tmp && pi
-```
-
-### Publishing updates
-
-```bash
-npm version patch -w @ineersa/my-pi-extensions -w @ineersa/my-pi-scheduler -w @ineersa/my-pi-jetbrains-index -w @ineersa/my-pi-themes -w @ineersa/my-pi
-npm run publish:all
-```
-
-## Code Style & Conventions
-
-- **Language:** TypeScript 5.x, strict mode, ES2022 target, NodeNext modules
-- **Formatting:** no project-level formatter configured; follow existing style
-  (tabs, 100-char line hint, trailing semicolons)
-- **Naming:** `kebab-case` file names, `camelCase` functions, `PascalCase`
-  exported types/classes
-- **Exports:** each extension entry must `export default function
-  <name>Extension(pi: ExtensionAPI): void`
-- **Imports:** use `.js` extension in relative imports (NodeNext resolution)
-- **Commit messages:** no enforced convention yet
-
-> TODO: add biome or prettier config for consistent formatting
-
-## Architecture Notes
-
-```
-┌──────────────────────────────────────────────────────┐
-│                    pi-coding-agent                    │
-│                                                      │
-│  ┌─────────────┐  pi.install()  ┌────────────────┐  │
-│  │ my-pi CLI   │───────────────>│ .pi/settings.  │  │
-│  │ (installer) │                │    json         │  │
-│  └─────────────┘                └───────┬────────┘  │
-│                                         │ loads      │
-│         ┌───────────────────────────────┘           │
-│         ▼                                           │
-│  ┌──────────────────┐  ┌──────────────────────────┐ │
-│  │ @ineersa/        │  │ @ineersa/                │ │
-│  │ my-pi-extensions │  │ my-pi-scheduler          │ │
-│  │                  │  │                          │ │
-│  │  safe-guard/     │  │  scheduler.ts            │ │
-│  │  session-status  │  │  scheduler-parsing.ts    │ │
-│  │  rewind          │  │  scheduler-registration  │ │
-│  └──────────────────┘  │  scheduler-shared.ts     │ │
-│                        └──────────────────────────┘ │
-└──────────────────────────────────────────────────────┘
-```
-
-- **safe-guard** hooks `tool_call` events for bash/write/edit/read tools,
-  classifies intent, and blocks/asks based on a persistent JSON policy file;
-  reads from `.pi/safe-guard.json` (project-local) → `~/.pi/agent/safe-guard.json`
-  (global) → built-in defaults
-- **rewind** captures git worktree snapshots at every prompt boundary,
-  stores metadata in hidden session entries, and offers exact file restoration
-  during `/fork` and `/tree` navigation
-- **session-status** listens to `session_start`/`session_shutdown` to set a
-  status bar label and registers `/my-pi` for a quick health check
-- **scheduler** uses a `SchedulerRuntime` singleton that persists tasks to
-  `~/.pi/agent/scheduler/<workspace>/scheduler.json`, dispatches prompts via
-  `pi.sendUserMessage()` when idle, and manages multi-instance ownership
-  through lease files
-- **jetbrains-index** injects IDE-first semantic tool guidance, blocks
-  `edit`/`write` while JetBrains indexing is in dumb mode, and reports new
-  diagnostics after successful file mutations
-
-## Testing Strategy
-
-- **Unit tests:** co-located `*.test.ts` files using vitest (scheduler has
-  2,600+ lines of tests covering parsing, runtime, commands, tool actions,
-  persistence, and edge cases)
-- **Test files are excluded** from `tsconfig.json` and `package.json`
-  `files` arrays — they are not shipped to consumers
-- **No CI pipeline** configured yet for this repo
-
-> TODO: add `npm test` script and CI workflow; add tests for safe-guard
-
-## Security & Compliance
-
-- **No secrets in code** — all credentials/auth handled by pi core; extensions
-  never read tokens or API keys
-- **safe-guard** blocks `sudo`, asks before destructive commands, writes
-  outside CWD, and reads of sensitive files (`.env.*.local`, `.ssh/id_*`,
-  cloud creds, etc.)
-- **Scheduler storage** confined to `~/.pi/agent/scheduler/`; no user input
-  reaches filesystem paths without sanitization
-- **Rate limits:** scheduler caps at 6 dispatches/minute, 50 tasks max,
-  3-day recurring expiry
-- **Atomic writes:** both scheduler and safe-guard policy use write-to-temp +
-  rename
-- **License:** MIT (all packages); only runtime dependency is `croner` (MIT)
-
-## Agent Guardrails
-
-- **Never modify** `packages/my-pi/bin/my-pi.mjs` without manual review — it
-  executes `pi` via `child_process`
-- **Never modify** `package-lock.json` directly — use `npm install <pkg>`
-- **Never commit** `.pi/` contents (git-ignored; contains local settings and
-  safe-guard policy)
-- **Never add** `node_modules` references in imports — use package names or
-  relative `.js` paths only
-- **New extensions** must be added to both the extension directory **and**
-  `package.json → pi.extensions` array
-- **New packages** must be added to `packages/my-pi/bin/package-list.mjs`
-- **TypeScript errors in test files** are expected (vitest not a workspace
-  dependency); only `npm run typecheck` output matters
-
-## Extensibility Hooks
-
-- **Adding an extension:** create `.ts` file or directory under
-  `packages/extensions/extensions/`, add entry to that package's
-  `pi.extensions` array, then `/reload` or restart pi
-- **Adding a package:** create new dir under `packages/` with its own
-  `package.json` (must include `"pi": { "extensions": [...] }`), then add it
-  to `INSTALLER_PACKAGES` in `packages/my-pi/bin/package-list.mjs`
-- **Safe-guard policy:** reads `.pi/safe-guard.json` (project-local) first, then
-  `~/.pi/agent/safe-guard.json` (global fallback), then built-in defaults;
-  `npx @ineersa/my-pi` deploys a default global policy
-- **Scheduler scope:** tasks default to `instance` scope; use `--workspace`
-  flag or `scope: "workspace"` tool param for cross-instance monitors
-- **pi event bus:** extensions can emit custom events via `pi.events.on()`
-  (e.g., `oh-pi:safe-mode`)
+- Do not modify `packages/my-pi/bin/my-pi.mjs` without manual review.
+- Do not edit `package-lock.json` manually; use `npm install`.
+- Never commit `.pi/` contents.
+- Keep imports package-based or relative with `.js` extension (NodeNext).
+- New extension entries must also be added to the owning package `pi.extensions`.
+- New packages must be added to `packages/my-pi/bin/package-list.mjs`.
+- Tests may have TS errors locally; `npm run typecheck` is the source of truth.
+- Before changing extension behavior, read that package’s docs index:
+  `packages/<pkg>/docs/ai-index.json`, then only the referenced
+  `settings.md` + `maintenance.md`.
+- Each extension/package may include its own local `AGENTS.md` for focused
+  architecture notes and development guardrails; keep those aligned with
+  the package’s `ai-index.json` docs map.
 
 ## Tool Preferences
 
@@ -236,18 +136,15 @@ When working with this codebase:
 - These tools are faster, more context-efficient, and better integrated with the IDE than the default tools
 - Only fall back to default tools when IDE tools do not support the needed operation (e.g., regex search)
 
-## Further Reading
+## References
 
-- [Root README](README.md) — quick start and project layout
-- [Extensions README](packages/extensions/README.md) — bundle contents and
-  how to add extensions
-- [Safe-guard README](packages/extensions/extensions/safe-guard/README.md) —
-  permission rules, policy file format, commands
-- [Rewind README](packages/extensions/extensions/rewind/README.md) —
-  file snapshots, restore options, retention, configuration
-- [Scheduler README](packages/scheduler/README.md) — commands, tool API,
-  ownership model, limits
-- [JetBrains Index README](packages/jetbrains-index/README.md) — diagnostics
-  gate behavior and package usage
-- [Installer README](packages/my-pi/README.md) — CLI options and package
-  table
+- [Root README](README.md) (quick start and workspace overview)
+- [Extensions README](packages/extensions/README.md)
+- [Scheduler README](packages/scheduler/README.md)
+- [JetBrains Index README](packages/jetbrains-index/README.md)
+- [Themes README](packages/themes/README.md)
+- [Installer README](packages/my-pi/README.md)
+- Package docs indexes:
+  - [Extensions ai-index](packages/extensions/docs/ai-index.json)
+  - [Scheduler ai-index](packages/scheduler/docs/ai-index.json)
+  - [JetBrains Index ai-index](packages/jetbrains-index/docs/ai-index.json)
