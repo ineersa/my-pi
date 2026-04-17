@@ -20,7 +20,8 @@
       "./extensions/jetbrains-index",
       "./extensions/subagents-lite",
       "./extensions/intercom",
-      "./extensions/custom-compaction"
+      "./extensions/custom-compaction",
+      "./extensions/output-cap"
     ]
   },
   "files": [

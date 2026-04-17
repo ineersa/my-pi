@@ -23,12 +23,12 @@ interface Skill {
 }
 
 interface SkillPaletteState {
-	queuedSkill: Skill | null;
+	queuedSkills: Skill[];
 }
 
 // Shared state across the extension
 const state: SkillPaletteState = {
-	queuedSkill: null,
+	queuedSkills: [],
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -40,13 +40,11 @@ interface PaletteTheme {
 	title: string;         // Title text
 	selected: string;      // Selected item highlight
 	selectedText: string;  // Selected item text
-	queued: string;        // Queued badge
+	queued: string;        // Selection count badge
 	searchIcon: string;    // Search icon
 	placeholder: string;   // Placeholder text
 	description: string;   // Skill descriptions
 	hint: string;          // Footer hints
-	confirm: string;       // Confirm button (keep)
-	cancel: string;        // Cancel button (remove)
 }
 
 const DEFAULT_THEME: PaletteTheme = {
@@ -59,8 +57,6 @@ const DEFAULT_THEME: PaletteTheme = {
 	placeholder: "2;3",    // dim italic
 	description: "2",      // dim
 	hint: "2",             // dim
-	confirm: "32",         // green
-	cancel: "31",          // red
 };
 
 function loadTheme(): PaletteTheme {
@@ -332,160 +328,6 @@ function filterSkills(skills: Skill[], query: string): Skill[] {
 }
 
 /**
- * Confirmation Dialog Component
- */
-class ConfirmDialog {
-	private selected = 1; // 0 = Remove, 1 = Keep (default to Keep)
-	private timeoutId: ReturnType<typeof setTimeout> | null = null;
-	private remainingSeconds = 30;
-	private intervalId: ReturnType<typeof setInterval> | null = null;
-	private requestRender: (() => void) | null = null;
-
-	constructor(
-		private skillName: string,
-		private done: (confirmed: boolean) => void
-	) {
-		this.timeoutId = setTimeout(() => {
-			this.cleanup();
-			this.done(false);
-		}, 30000);
-	}
-
-	/** Call after construction to start the countdown timer */
-	setRequestRender(fn: () => void): void {
-		this.requestRender = fn;
-		// Start interval now that we can trigger re-renders
-		this.intervalId = setInterval(() => {
-			if (this.remainingSeconds > 0) {
-				this.remainingSeconds--;
-				this.requestRender?.();
-			}
-		}, 1000);
-	}
-
-	private cleanup(): void {
-		if (this.timeoutId) clearTimeout(this.timeoutId);
-		if (this.intervalId) clearInterval(this.intervalId);
-	}
-
-	handleInput(data: string): void {
-		if (matchesKey(data, "escape")) {
-			this.cleanup();
-			this.done(false);
-			return;
-		}
-
-		if (matchesKey(data, "return")) {
-			this.cleanup();
-			this.done(this.selected === 0);
-			return;
-		}
-
-		if (matchesKey(data, "left") || matchesKey(data, "right") || matchesKey(data, "tab")) {
-			this.selected = this.selected === 0 ? 1 : 0;
-			return;
-		}
-
-		if (data === "y" || data === "Y") {
-			this.cleanup();
-			this.done(true);
-			return;
-		}
-
-		if (data === "n" || data === "N") {
-			this.cleanup();
-			this.done(false);
-			return;
-		}
-	}
-
-	render(width: number): string[] {
-		const innerW = width - 2;
-		const lines: string[] = [];
-
-		// Theme-aware color helpers
-		const t = paletteTheme;
-		const border = (s: string) => fg(t.border, s);
-		const title = (s: string) => fg(t.title, s);
-		const selected = (s: string) => fg(t.selected, s);
-		const confirm = (s: string) => fg(t.confirm, s);
-		const cancel = (s: string) => fg(t.cancel, s);
-		const hint = (s: string) => fg(t.hint, s);
-		const bold = (s: string) => `\x1b[1m${s}\x1b[22m`;
-		const italic = (s: string) => `\x1b[3m${s}\x1b[23m`;
-		const inverse = (s: string) => `\x1b[7m${s}\x1b[27m`;
-
-		const visLen = visibleWidth;
-
-		const center = (s: string, len: number) => {
-			const truncated = truncateToWidth(s, len, "…");
-			const padding = Math.max(0, len - visLen(truncated));
-			const left = Math.floor(padding / 2);
-			return " ".repeat(left) + truncated + " ".repeat(padding - left);
-		};
-
-		const row = (content: string) => border("│") + truncateToWidth(" " + content, innerW, "…", true) + border("│");
-		const centerRow = (content: string) => border("│") + center(content, innerW) + border("│");
-		const emptyRow = () => border("│") + " ".repeat(innerW) + border("│");
-
-		// Top border with title
-		const titleText = " Unqueue Skill ";
-		const borderLen = innerW - visLen(titleText);
-		const leftBorder = Math.floor(borderLen / 2);
-		const rightBorder = borderLen - leftBorder;
-		lines.push(border("╭" + "─".repeat(leftBorder)) + title(titleText) + border("─".repeat(rightBorder) + "╮"));
-
-		lines.push(emptyRow());
-		
-		// Skill name with icon
-		lines.push(centerRow(`${selected("◆")} ${bold(this.skillName)}`));
-		
-		lines.push(emptyRow());
-
-		// Divider
-		lines.push(border("├" + "─".repeat(innerW) + "┤"));
-		
-		lines.push(emptyRow());
-
-		// Buttons - pill style with inverse for selection
-		const removeLabel = "  Remove  ";
-		const keepLabel = "  Keep  ";
-		
-		const removeBtn = this.selected === 0 
-			? inverse(bold(cancel(removeLabel)))
-			: hint(removeLabel);
-		const keepBtn = this.selected === 1 
-			? inverse(bold(confirm(keepLabel)))
-			: hint(keepLabel);
-		
-		lines.push(centerRow(`${removeBtn}   ${keepBtn}`));
-
-		lines.push(emptyRow());
-
-		// Timeout - rainbow progress indicator
-		const prog = Math.max(0, Math.min(10, Math.round((this.remainingSeconds / 30) * 10)));
-		const progressBar = rainbowProgress(prog, 10);
-		lines.push(centerRow(`${progressBar}  ${hint(`${this.remainingSeconds}s`)}`));
-
-		lines.push(emptyRow());
-
-		// Footer hints - minimal
-		lines.push(centerRow(hint(italic("tab") + " switch  " + italic("enter") + " confirm  " + italic("esc") + " cancel")));
-
-		// Bottom border
-		lines.push(border(`╰${"─".repeat(innerW)}╯`));
-
-		return lines;
-	}
-
-	invalidate(): void {}
-	
-	dispose(): void {
-		this.cleanup();
-	}
-}
-
-/**
  * Skill Palette Overlay Component
  */
 class SkillPaletteComponent {
@@ -493,18 +335,21 @@ class SkillPaletteComponent {
 	private filtered: Skill[];
 	private selected = 0;
 	private query = "";
-	private queuedSkillName: string | null;
+	private selectedSkills = new Set<string>();
 	private inactivityTimeout: ReturnType<typeof setTimeout> | null = null;
 	private static readonly INACTIVITY_MS = 60000; // Auto-dismiss after 60s of no input
 
 	constructor(
 		skills: Skill[],
-		queuedSkill: Skill | null,
-		private done: (skill: Skill | null, action: "select" | "unqueue" | "cancel") => void
+		queuedSkills: Skill[],
+		private done: (skills: Skill[], action: "select" | "cancel") => void
 	) {
 		this.allSkills = skills;
 		this.filtered = skills;
-		this.queuedSkillName = queuedSkill?.name ?? null;
+		// Pre-populate with currently queued skills
+		for (const s of queuedSkills) {
+			this.selectedSkills.add(s.name);
+		}
 		this.resetInactivityTimeout();
 	}
 
@@ -512,7 +357,7 @@ class SkillPaletteComponent {
 		if (this.inactivityTimeout) clearTimeout(this.inactivityTimeout);
 		this.inactivityTimeout = setTimeout(() => {
 			this.cleanup();
-			this.done(null, "cancel");
+			this.done([], "cancel");
 		}, SkillPaletteComponent.INACTIVITY_MS);
 	}
 
@@ -521,19 +366,28 @@ class SkillPaletteComponent {
 
 		if (matchesKey(data, "escape")) {
 			this.cleanup();
-			this.done(null, "cancel");
+			this.done([], "cancel");
 			return;
 		}
 
+		// Enter: confirm and apply all selected skills
 		if (matchesKey(data, "return")) {
+			this.cleanup();
+			const selected = Array.from(this.selectedSkills)
+				.map((name: string) => this.allSkills.find((s: Skill) => s.name === name))
+				.filter((s: Skill | undefined): s is Skill => s !== undefined);
+			this.done(selected, "select");
+			return;
+		}
+
+		// Space: toggle selection for current skill
+		if (data === " ") {
 			const skill = this.filtered[this.selected];
 			if (skill) {
-				this.cleanup();
-				// Toggle: if already queued, unqueue it
-				if (skill.name === this.queuedSkillName) {
-					this.done(skill, "unqueue");
+				if (this.selectedSkills.has(skill.name)) {
+					this.selectedSkills.delete(skill.name);
 				} else {
-					this.done(skill, "select");
+					this.selectedSkills.add(skill.name);
 				}
 			}
 			return;
@@ -594,7 +448,15 @@ class SkillPaletteComponent {
 		const visLen = visibleWidth;
 
 		const row = (content: string) => border("│") + truncateToWidth(" " + content, innerW, "…", true) + border("│");
+		const centerRow = (content: string) => border("│") + center(content, innerW) + border("│");
 		const emptyRow = () => border("│") + " ".repeat(innerW) + border("│");
+
+		const center = (s: string, len: number) => {
+			const truncated = truncateToWidth(s, len, "…");
+			const padding = Math.max(0, len - visLen(truncated));
+			const left = Math.floor(padding / 2);
+			return " ".repeat(left) + truncated + " ".repeat(padding - left);
+		};
 
 		// Top border with title
 		const titleText = " Skills ";
@@ -631,18 +493,18 @@ class SkillPaletteComponent {
 			lines.push(emptyRow());
 			for (let i = startIndex; i < endIndex; i++) {
 				const skill = this.filtered[i];
-				const isSelected = i === this.selected;
-				const isQueued = skill.name === this.queuedSkillName;
+				const isCursor = i === this.selected;
+				const isSel = this.selectedSkills.has(skill.name);
 				
 				// Build the skill line
-				const prefix = isSelected ? selected("▸") : border("·");
-				const queuedBadge = isQueued ? ` ${queued("●")}` : "";
-				const nameStr = isSelected ? bold(selectedText(skill.name)) : skill.name;
-				const maxDescLen = Math.max(0, innerW - visLen(skill.name) - 12);
+				const prefix = isCursor ? selected("▸") : border("·");
+				const selBadge = isSel ? ` ${selected("✓")}` : "";
+				const nameStr = isCursor ? bold(selectedText(skill.name)) : skill.name;
+				const maxDescLen = Math.max(0, innerW - visLen(skill.name) - 16);
 				const descStr = maxDescLen > 3 ? description(truncateToWidth(skill.description, maxDescLen, "…")) : "";
 				
 				const separator = descStr ? `  ${border("—")}  ` : "";
-				const skillLine = `${prefix} ${nameStr}${queuedBadge}${separator}${descStr}`;
+				const skillLine = `${prefix} ${nameStr}${selBadge}${separator}${descStr}`;
 				lines.push(row(skillLine));
 			}
 			lines.push(emptyRow());
@@ -660,12 +522,24 @@ class SkillPaletteComponent {
 		// Divider
 		lines.push(border("├" + "─".repeat(innerW) + "┤"));
 
+		// Selection count bar
+		const selCount = this.selectedSkills.size;
+		if (selCount > 0) {
+			lines.push(emptyRow());
+			const countBadge = fg(t.queued, ` ${selCount} selected `);
+			lines.push(centerRow(`${countBadge}`));
+			lines.push(emptyRow());
+		}
+
+		// Divider
+		lines.push(border("├" + "─".repeat(innerW) + "┤"));
+
 		lines.push(emptyRow());
 
 		// Footer hints - minimal and elegant
-		const hints = this.queuedSkillName 
-			? `${italic("↑↓")} navigate  ${italic("enter")} select${hint("/")}unqueue  ${italic("esc")} cancel`
-			: `${italic("↑↓")} navigate  ${italic("enter")} select  ${italic("esc")} cancel`;
+		const hints = selCount > 0
+			? `${italic("↑↓")} navigate  ${italic("space")} toggle  ${italic("enter")} apply ${selCount}  ${italic("esc")} cancel`
+			: `${italic("↑↓")} navigate  ${italic("space")} toggle  ${italic("enter")} apply  ${italic("esc")} cancel`;
 		lines.push(row(hint(hints)));
 
 		// Bottom border
@@ -689,6 +563,9 @@ class SkillPaletteComponent {
 }
 
 export default function skillPaletteExtension(pi: ExtensionAPI): void {
+	// Regex to extract all <skill> blocks
+	const skillBlockRe = /<skill name="([^"]+)">\n?([\s\S]*?)\n?<\/skill>/g;
+
 	// Register custom renderer for skill-context messages
 	pi.registerMessageRenderer("skill-context", (message, options, theme) => {
 		// Extract skill name and content (handle both string and array content)
@@ -697,44 +574,68 @@ export default function skillPaletteExtension(pi: ExtensionAPI): void {
 			: Array.isArray(message.content)
 				? message.content.map((c: { type: string; text?: string }) => c.type === "text" ? c.text || "" : "").join("")
 				: "";
-		const nameMatch = rawContent.match(/<skill name="([^"]+)">/);
-		const skillName = nameMatch?.[1] || "Unknown Skill";
-		
-		// Extract skill content (between <skill> tags)
-		const contentMatch = rawContent.match(/<skill[^>]*>\n?([\s\S]*?)\n?<\/skill>/);
-		const skillContent = contentMatch?.[1]?.trim() || rawContent;
-		
+
 		const container = new Container();
-		
-		// Header with file icon and skill name (like read tool)
+
+		// Extract all skill blocks
+		const blocks: { name: string; content: string }[] = [];
+		let match;
+		while ((match = skillBlockRe.exec(rawContent)) !== null) {
+			blocks.push({ name: match[1], content: match[2].trim() });
+		}
+
+		// If no blocks found, show raw content as fallback
+		if (blocks.length === 0) {
+			const header = new Text(
+				theme.fg("accent", "◆ ") +
+				theme.fg("customMessageLabel", theme.bold("Skill: ")) +
+				theme.fg("accent", "Unknown Skill"),
+				1, 0
+			);
+			container.addChild(header);
+			const lines = rawContent.split("\n");
+			for (const line of lines.slice(0, 8)) {
+				container.addChild(new Text(theme.fg("dim", line), 1, 0));
+			}
+			return container;
+		}
+
+		// Header with count
 		const header = new Text(
-			theme.fg("accent", "◆ ") + 
-			theme.fg("customMessageLabel", theme.bold("Skill: ")) + 
-			theme.fg("accent", skillName),
+			theme.fg("accent", "◆ ") +
+			theme.fg("customMessageLabel", theme.bold(`Skills: ${blocks.length}`)),
 			1, 0
 		);
 		container.addChild(header);
-		
-		// Content preview (collapsible like read tool)
-		const lines = skillContent.split("\n");
-		const PREVIEW_LINES = 8;
-		const isLong = lines.length > PREVIEW_LINES;
-		const showLines = options.expanded ? lines : lines.slice(0, PREVIEW_LINES);
-		
-		// Add content lines with dim styling
-		for (const line of showLines) {
-			container.addChild(new Text(theme.fg("dim", line), 1, 0));
-		}
-		
-		// Show truncation indicator if collapsed and content is long
-		if (!options.expanded && isLong) {
-			const hiddenCount = lines.length - PREVIEW_LINES;
+
+		// Render each skill block
+		for (const block of blocks) {
+			// Skill name separator
 			container.addChild(new Text(
-				theme.fg("muted", `... ${hiddenCount} more lines (click to expand)`),
+				theme.fg("accent", `\n  ── ${block.name} ──`),
 				1, 0
 			));
+
+			const lines = block.content.split("\n");
+			const PREVIEW_LINES = 8;
+			const isLong = lines.length > PREVIEW_LINES;
+			const showLines = options.expanded ? lines : lines.slice(0, PREVIEW_LINES);
+
+			// Add content lines with dim styling
+			for (const line of showLines) {
+				container.addChild(new Text(theme.fg("dim", line), 1, 0));
+			}
+
+			// Show truncation indicator if collapsed and content is long
+			if (!options.expanded && isLong) {
+				const hiddenCount = lines.length - PREVIEW_LINES;
+				container.addChild(new Text(
+					theme.fg("muted", `... ${hiddenCount} more lines (click to expand)`),
+					1, 0
+				));
+			}
 		}
-		
+
 		return container;
 	});
 
@@ -751,68 +652,61 @@ export default function skillPaletteExtension(pi: ExtensionAPI): void {
 			}
 
 			// Show the overlay and wait for result
-			const result = await ctx.ui.custom<{ skill: Skill | null; action: "select" | "unqueue" | "cancel" }>(
+			const result = await ctx.ui.custom<{ skills: Skill[]; action: "select" | "cancel" }>(
 				(_tui, _theme, _keybindings, done) => new SkillPaletteComponent(
 					skills,
-					state.queuedSkill,
-					(skill, action) => done({ skill, action })
+					state.queuedSkills,
+					(skills, action) => done({ skills, action })
 				),
 				{ overlay: true, overlayOptions: { anchor: "center", width: 70 } }
 			);
 
-			if (result.action === "select" && result.skill) {
-				state.queuedSkill = result.skill;
-				ctx.ui.setStatus("skill", `📚 ${result.skill.name}`);
-				ctx.ui.setWidget("skill", [`\x1b[2m📚 Skill: \x1b[0m\x1b[36m${result.skill.name}\x1b[0m\x1b[2m — will be applied to next message\x1b[0m`]);
-				ctx.ui.notify(`Skill queued: ${result.skill.name}`, "info");
-			} else if (result.action === "unqueue" && result.skill) {
-				// Show confirmation dialog
-				const confirmed = await ctx.ui.custom<boolean>(
-					(tui, _theme, _keybindings, done) => {
-						const dialog = new ConfirmDialog(result.skill!.name, done);
-						dialog.setRequestRender(() => tui.requestRender());
-						return dialog;
-					},
-					{ overlay: true, overlayOptions: { anchor: "center", width: 44 } }
-				);
-
-				if (confirmed) {
-					state.queuedSkill = null;
-					ctx.ui.setStatus("skill", undefined);
-					ctx.ui.setWidget("skill", undefined);
-					ctx.ui.notify("Skill unqueued", "info");
-				}
+			if (result.action === "select" && result.skills.length > 0) {
+				state.queuedSkills = result.skills;
+				const names = result.skills.map(s => s.name).join(", ");
+				ctx.ui.setStatus("skill", `📚 ${result.skills.length} skill${result.skills.length > 1 ? "s" : ""}`);
+				ctx.ui.setWidget("skill", [
+					`\x1b[2m📚 Skills: \x1b[0m\x1b[36m${names}\x1b[0m\x1b[2m — will be applied to next message\x1b[0m`,
+				]);
+				ctx.ui.notify(`Queued ${result.skills.length} skill${result.skills.length > 1 ? "s" : ""}: ${names}`, "info");
 			}
 		},
 	});
 
-	// Handle the before_agent_start event to send skill content as custom message
+	// Handle the before_agent_start event to send skill content as custom messages
 	pi.on("before_agent_start", async (_event, ctx) => {
-		if (!state.queuedSkill) {
+		if (state.queuedSkills.length === 0) {
 			return {};
 		}
 
-		const skill = state.queuedSkill;
-		state.queuedSkill = null;
+		const skills = state.queuedSkills;
+		state.queuedSkills = [];
 
 		// Clear the visual indicators (use optional chaining for non-UI contexts)
 		ctx.ui?.setStatus("skill", undefined);
 		ctx.ui?.setWidget("skill", undefined);
 
-		try {
-			const skillContent = getSkillContent(skill);
+		const contentParts: string[] = [];
 
-			return {
-				message: {
-					customType: "skill-context",
-					content: `<skill name="${skill.name}">\n${skillContent}\n</skill>`,
-					display: true,  // Show the skill injection in chat
-				},
-			};
-		} catch {
-			ctx.ui?.setWidget("skill", undefined);
-			ctx.ui?.notify(`Failed to load skill: ${skill.name}`, "warning");
+		for (const skill of skills) {
+			try {
+				const skillContent = getSkillContent(skill);
+				contentParts.push(`<skill name="${skill.name}">\n${skillContent}\n</skill>`);
+			} catch {
+				ctx.ui?.notify(`Failed to load skill: ${skill.name}`, "warning");
+			}
+		}
+
+		if (contentParts.length === 0) {
 			return {};
 		}
+
+		return {
+			message: {
+				customType: "skill-context",
+				content: contentParts.join("\n\n"),
+				display: true,  // Show the skill injection in chat
+			},
+		};
 	});
 }

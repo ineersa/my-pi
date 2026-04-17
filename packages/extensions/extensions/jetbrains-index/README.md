@@ -25,9 +25,18 @@ JetBrains index diagnostics gate for pi sessions.
 
 ## Activation rule
 
-This extension stays **disabled** unless **both** conditions are true:
+This extension is **completely dormant** unless the current working directory contains a `.idea/` folder.
 
-1. Current working directory contains a `.idea/` folder
-2. The `jetbrains-index` MCP server is reachable from one of:
-   - `.pi/mcp.json`
-   - `~/.pi/agent/mcp.json`
+When no `.idea/` directory is found, the extension:
+
+- Skips MCP server discovery and connection attempts
+- Does not inject any system prompt policy or IDE nudges
+- Does not intercept `tool_call` or `tool_result` events
+- Does not track read efficiency, non-symbolic streaks, or diagnostics
+
+When `.idea/` exists, the extension additionally requires the `jetbrains-index` MCP server to be reachable from one of:
+
+- `.pi/mcp.json`
+- `~/.pi/agent/mcp.json`
+
+If the MCP server is unavailable, the extension disables its diagnostics gate but still reports the status via UI notifications.

@@ -2,15 +2,24 @@
 
 Adapted from [`nicobailon/pi-skill-palette`](https://github.com/nicobailon/pi-skill-palette) for `@ineersa/my-pi-extensions`.
 
-Interactive `/skill` command palette for selecting one skill to inject into your **next** prompt.
+Interactive `/skill` command palette for selecting **multiple** skills to inject into your **next** prompt.
 
 ## What it does
 
 - Adds `/skill` command with fuzzy search.
-- Queues one selected skill at a time.
-- Shows queued skill in status + widget.
-- Injects selected skill as a custom `skill-context` message on next turn.
-- Supports unqueue with confirmation dialog.
+- Queues **multiple** selected skills at a time.
+- Shows all queued skills in status + widget.
+- Injects all queued skills as `skill-context` messages on next turn.
+- Pre-populates with currently queued skills for easy review.
+
+## Usage
+
+- Run `/skill` to open the skill palette.
+- Use `↑`/`↓` to navigate the list.
+- Type to filter skills (fuzzy match on name + description).
+- Press `Space` to toggle a skill's selection (✓ badge appears).
+- Press `Enter` to confirm and apply all selected skills.
+- Press `Esc` to cancel.
 
 ## Skill discovery order
 

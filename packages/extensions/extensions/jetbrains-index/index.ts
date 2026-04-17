@@ -1,4 +1,5 @@
 import { resolve } from "node:path";
+import { statSync } from "node:fs";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { formatDiagnosticsSummary } from "./diagnostics.js";
 import {
@@ -175,7 +176,20 @@ export default function jetbrainsIndexExtension(pi: ExtensionAPI): void {
 		uiNotify?.(message, level);
 	});
 
+	function hasIdeaDirectory(cwd: string): boolean {
+		try {
+			return statSync(resolve(cwd, ".idea")).isDirectory();
+		} catch {
+			return false;
+		}
+	}
+
 	async function refreshExtensionEnabled(cwd: string): Promise<boolean> {
+		if (!hasIdeaDirectory(cwd)) {
+			extensionEnabled = false;
+			await tracker.shutdown();
+			return false;
+		}
 		try {
 			const connected = await tracker.initialize(cwd);
 			extensionEnabled = connected;
@@ -246,8 +260,12 @@ export default function jetbrainsIndexExtension(pi: ExtensionAPI): void {
 	});
 
 	pi.on("before_agent_start", (event) => {
+		if (!extensionEnabled) {
+			return;
+		}
+
 		const reminders = [wrapSystemReminder(buildSystemPromptPolicy(pi.getActiveTools()))];
-		if (extensionEnabled && sessionStartNudgePending) {
+		if (sessionStartNudgePending) {
 			sessionStartNudgePending = false;
 			reminders.push(wrapSystemReminder([
 				"JetBrains index is available in this session.",
@@ -263,6 +281,10 @@ export default function jetbrainsIndexExtension(pi: ExtensionAPI): void {
 	});
 
 	pi.on("tool_call", async (event, ctx) => {
+		if (!extensionEnabled) {
+			return;
+		}
+
 		const input = (event.input ?? {}) as Record<string, unknown>;
 		const effectiveToolName = resolveEffectiveToolName(event.toolName, input);
 
@@ -286,10 +308,6 @@ export default function jetbrainsIndexExtension(pi: ExtensionAPI): void {
 				block: true,
 				reason,
 			};
-		}
-
-		if (!extensionEnabled) {
-			return;
 		}
 
 		if (isSemanticIdeTool(effectiveToolName)) {
@@ -355,6 +373,10 @@ export default function jetbrainsIndexExtension(pi: ExtensionAPI): void {
 	});
 
 	pi.on("tool_result", async (event, ctx) => {
+		if (!extensionEnabled) {
+			return;
+		}
+
 		const input = (event.input ?? {}) as Record<string, unknown>;
 
 		if (event.toolName === "read" && !event.isError) {
@@ -434,10 +456,6 @@ export default function jetbrainsIndexExtension(pi: ExtensionAPI): void {
 					};
 				}
 			}
-		}
-
-		if (!extensionEnabled) {
-			return;
 		}
 
 		if (event.toolName !== "edit" && event.toolName !== "write") {
