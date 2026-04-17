@@ -1,7 +1,7 @@
 {
   "name": "my-pi-workspace",
   "private": true,
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Personal pi extension suite and installer",
   "workspaces": [
     "packages/*"
