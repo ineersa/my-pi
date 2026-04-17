@@ -12,6 +12,7 @@
   },
   "files": [
     "themes",
+    "docs",
     "README.md"
   ],
   "license": "MIT"

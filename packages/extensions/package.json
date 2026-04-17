@@ -25,6 +25,7 @@
   },
   "files": [
     "extensions",
+    "docs",
     "README.md"
   ],
   "dependencies": {

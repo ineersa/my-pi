@@ -16,6 +16,7 @@
     "copy:settings": "node scripts/copy-settings.mjs",
     "settings:pull": "node scripts/copy-settings.mjs pull",
     "settings:push": "node scripts/copy-settings.mjs push",
+    "docs:check": "node scripts/check-ai-docs.mjs",
     "typecheck": "tsc --noEmit",
     "publish:all": "npm publish --workspace=@ineersa/my-pi-extensions --access public && npm publish --workspace=@ineersa/my-pi-scheduler --access public && npm publish --workspace=@ineersa/my-pi-jetbrains-index --access public && npm publish --workspace=@ineersa/my-pi-themes --access public && npm publish --workspace=@ineersa/my-pi --access public"
   },

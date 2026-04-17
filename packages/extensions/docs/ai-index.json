@@ -1,0 +1,151 @@
+{
+  "spec": "my-pi.ai-docs/v1",
+  "package": "@ineersa/my-pi-extensions",
+  "version": "0.1.2",
+  "updatedAt": "2026-04-17",
+  "entities": [
+    {
+      "id": "safe-guard",
+      "kind": "extension",
+      "name": "safe-guard",
+      "entry": "./extensions/safe-guard/safe-guard.ts",
+      "docs": {
+        "settings": "docs/extensions/safe-guard/settings.md",
+        "usage": "docs/extensions/safe-guard/usage.md",
+        "maintenance": "docs/extensions/safe-guard/maintenance.md"
+      }
+    },
+    {
+      "id": "bg-process",
+      "kind": "extension",
+      "name": "bg-process",
+      "entry": "./extensions/bg-process.ts",
+      "docs": {
+        "settings": "docs/extensions/bg-process/settings.md",
+        "usage": "docs/extensions/bg-process/usage.md",
+        "maintenance": "docs/extensions/bg-process/maintenance.md"
+      }
+    },
+    {
+      "id": "compact-header",
+      "kind": "extension",
+      "name": "compact-header",
+      "entry": "./extensions/compact-header.ts",
+      "docs": {
+        "settings": "docs/extensions/compact-header/settings.md",
+        "usage": "docs/extensions/compact-header/usage.md",
+        "maintenance": "docs/extensions/compact-header/maintenance.md"
+      }
+    },
+    {
+      "id": "custom-footer",
+      "kind": "extension",
+      "name": "custom-footer",
+      "entry": "./extensions/custom-footer.ts",
+      "docs": {
+        "settings": "docs/extensions/custom-footer/settings.md",
+        "usage": "docs/extensions/custom-footer/usage.md",
+        "maintenance": "docs/extensions/custom-footer/maintenance.md"
+      }
+    },
+    {
+      "id": "skill-palette",
+      "kind": "extension",
+      "name": "skill-palette",
+      "entry": "./extensions/skill-palette/skill-palette.ts",
+      "docs": {
+        "settings": "docs/extensions/skill-palette/settings.md",
+        "usage": "docs/extensions/skill-palette/usage.md",
+        "maintenance": "docs/extensions/skill-palette/maintenance.md"
+      }
+    },
+    {
+      "id": "rewind",
+      "kind": "extension",
+      "name": "rewind",
+      "entry": "./extensions/rewind/rewind.ts",
+      "docs": {
+        "settings": "docs/extensions/rewind/settings.md",
+        "usage": "docs/extensions/rewind/usage.md",
+        "maintenance": "docs/extensions/rewind/maintenance.md"
+      }
+    },
+    {
+      "id": "session-status",
+      "kind": "extension",
+      "name": "session-status",
+      "entry": "./extensions/session-status.ts",
+      "docs": {
+        "settings": "docs/extensions/session-status/settings.md",
+        "usage": "docs/extensions/session-status/usage.md",
+        "maintenance": "docs/extensions/session-status/maintenance.md"
+      }
+    },
+    {
+      "id": "usage",
+      "kind": "extension",
+      "name": "usage",
+      "entry": "./extensions/usage.ts",
+      "docs": {
+        "settings": "docs/extensions/usage/settings.md",
+        "usage": "docs/extensions/usage/usage.md",
+        "maintenance": "docs/extensions/usage/maintenance.md"
+      }
+    },
+    {
+      "id": "pi-mcp-adapter",
+      "kind": "extension",
+      "name": "pi-mcp-adapter",
+      "entry": "./extensions/pi-mcp-adapter/pi-mcp-adapter.ts",
+      "docs": {
+        "settings": "docs/extensions/pi-mcp-adapter/settings.md",
+        "usage": "docs/extensions/pi-mcp-adapter/usage.md",
+        "maintenance": "docs/extensions/pi-mcp-adapter/maintenance.md"
+      }
+    },
+    {
+      "id": "subagents-lite",
+      "kind": "extension",
+      "name": "subagents-lite",
+      "entry": "./extensions/subagents-lite/subagents-lite.ts",
+      "docs": {
+        "settings": "docs/extensions/subagents-lite/settings.md",
+        "usage": "docs/extensions/subagents-lite/usage.md",
+        "maintenance": "docs/extensions/subagents-lite/maintenance.md"
+      }
+    },
+    {
+      "id": "intercom",
+      "kind": "extension",
+      "name": "intercom",
+      "entry": "./extensions/intercom/intercom.ts",
+      "docs": {
+        "settings": "docs/extensions/intercom/settings.md",
+        "usage": "docs/extensions/intercom/usage.md",
+        "maintenance": "docs/extensions/intercom/maintenance.md"
+      }
+    },
+    {
+      "id": "custom-compaction",
+      "kind": "extension",
+      "name": "custom-compaction",
+      "entry": "./extensions/custom-compaction/custom-compaction.ts",
+      "docs": {
+        "settings": "docs/extensions/custom-compaction/settings.md",
+        "usage": "docs/extensions/custom-compaction/usage.md",
+        "maintenance": "docs/extensions/custom-compaction/maintenance.md"
+      }
+    },
+    {
+      "id": "output-cap",
+      "kind": "extension",
+      "name": "output-cap",
+      "entry": "./extensions/output-cap/output-cap.ts",
+      "docs": {
+        "settings": "docs/extensions/output-cap/settings.md",
+        "usage": "docs/extensions/output-cap/usage.md",
+        "maintenance": "docs/extensions/output-cap/maintenance.md"
+      }
+    }
+  ]
+}

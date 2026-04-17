@@ -1,0 +1,89 @@
+{
+  "spec": "my-pi.ai-docs/v1",
+  "package": "@ineersa/my-pi-themes",
+  "version": "0.1.2",
+  "updatedAt": "2026-04-17",
+  "entities": [
+    {
+      "id": "catppuccin-mocha",
+      "kind": "theme",
+      "name": "catppuccin-mocha",
+      "entry": "./themes/catppuccin-mocha.json",
+      "docs": {
+        "settings": "docs/themes/catppuccin-mocha/settings.md",
+        "usage": "docs/themes/catppuccin-mocha/usage.md",
+        "maintenance": "docs/themes/catppuccin-mocha/maintenance.md"
+      }
+    },
+    {
+      "id": "cyberpunk",
+      "kind": "theme",
+      "name": "cyberpunk",
+      "entry": "./themes/cyberpunk.json",
+      "docs": {
+        "settings": "docs/themes/cyberpunk/settings.md",
+        "usage": "docs/themes/cyberpunk/usage.md",
+        "maintenance": "docs/themes/cyberpunk/maintenance.md"
+      }
+    },
+    {
+      "id": "gruvbox-dark",
+      "kind": "theme",
+      "name": "gruvbox-dark",
+      "entry": "./themes/gruvbox-dark.json",
+      "docs": {
+        "settings": "docs/themes/gruvbox-dark/settings.md",
+        "usage": "docs/themes/gruvbox-dark/usage.md",
+        "maintenance": "docs/themes/gruvbox-dark/maintenance.md"
+      }
+    },
+    {
+      "id": "nord",
+      "kind": "theme",
+      "name": "nord",
+      "entry": "./themes/nord.json",
+      "docs": {
+        "settings": "docs/themes/nord/settings.md",
+        "usage": "docs/themes/nord/usage.md",
+        "maintenance": "docs/themes/nord/maintenance.md"
+      }
+    },
+    {
+      "id": "oh-p-dark",
+      "kind": "theme",
+      "name": "oh-p-dark",
+      "entry": "./themes/oh-p-dark.json",
+      "docs": {
+        "settings": "docs/themes/oh-p-dark/settings.md",
+        "usage": "docs/themes/oh-p-dark/usage.md",
+        "maintenance": "docs/themes/oh-p-dark/maintenance.md"
+      }
+    },
+    {
+      "id": "tokyo-night",
+      "kind": "theme",
+      "name": "tokyo-night",
+      "entry": "./themes/tokyo-night.json",
+      "docs": {
+        "settings": "docs/themes/tokyo-night/settings.md",
+        "usage": "docs/themes/tokyo-night/usage.md",
+        "maintenance": "docs/themes/tokyo-night/maintenance.md"
+      }
+    },
+    {
+      "id": "theme-setting",
+      "kind": "setting",
+      "name": "theme",
+      "settingKey": "theme",
+      "scopes": [
+        "project",
+        "global"
+      ],
+      "docs": {
+        "settings": "docs/settings/theme/settings.md",
+        "usage": "docs/settings/theme/usage.md",
+        "maintenance": "docs/settings/theme/maintenance.md"
+      }
+    }
+  ]
+}

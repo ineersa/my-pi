@@ -1,0 +1,30 @@
+{
+  "spec": "my-pi.ai-docs/v1",
+  "package": "@ineersa/my-pi-scheduler",
+  "version": "0.1.2",
+  "updatedAt": "2026-04-17",
+  "entities": [
+    {
+      "id": "scheduler",
+      "kind": "extension",
+      "name": "scheduler",
+      "entry": "./extensions/scheduler.ts",
+      "docs": {
+        "settings": "docs/extensions/scheduler/settings.md",
+        "usage": "docs/extensions/scheduler/usage.md",
+        "maintenance": "docs/extensions/scheduler/maintenance.md"
+      }
+    },
+    {
+      "id": "schedule_prompt",
+      "kind": "tool",
+      "name": "schedule_prompt",
+      "entry": "./extensions/scheduler-registration.ts",
+      "docs": {
+        "settings": "docs/tools/schedule_prompt/settings.md",
+        "usage": "docs/tools/schedule_prompt/usage.md",
+        "maintenance": "docs/tools/schedule_prompt/maintenance.md"
+      }
+    }
+  ]
+}

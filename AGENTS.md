@@ -232,6 +232,7 @@ When working with this codebase:
 - If IDE tools fail unexpectedly or results seem incomplete, check `jetbrains_index_ide_index_status`
 - After creating/modifying files with `edit`/`write`, run `jetbrains_index_ide_sync_files` on changed paths before retrying IDE queries
 - Use project-relative file paths and 1-based `line`/`column` for IDE tool calls
+- Before changing extension/tool/theme behavior, read the package docs index at `packages/<pkg>/docs/ai-index.json`, then open only the referenced `settings.md` + `maintenance.md` for the target entity
 - These tools are faster, more context-efficient, and better integrated with the IDE than the default tools
 - Only fall back to default tools when IDE tools do not support the needed operation (e.g., regex search)
 

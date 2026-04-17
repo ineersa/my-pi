@@ -22,6 +22,7 @@ import {
 import { ProblemsTracker } from "./problems-tracker.js";
 
 const SINGLETON_KEY = "__my_pi_jetbrains_index_owner__";
+const JETBRAINS_INDEX_PACKAGE_DOCS_INDEX = resolve(__dirname, "..", "..", "docs", "ai-index.json");
 
 function getFilePathFromToolInput(input: Record<string, unknown>): string | null {
 	const candidates = [input.path, input.file_path, input.filePath, input.file];
@@ -285,7 +286,12 @@ export default function jetbrainsIndexExtension(pi: ExtensionAPI): void {
 			return;
 		}
 
-		const reminders = [wrapSystemReminder(buildSystemPromptPolicy(pi.getActiveTools()))];
+		const reminders = [
+			wrapSystemReminder(buildSystemPromptPolicy(pi.getActiveTools())),
+			wrapSystemReminder(
+				`Before changing behavior, read this package docs index: ${JETBRAINS_INDEX_PACKAGE_DOCS_INDEX}; then read the target entity's settings.md + maintenance.md.`,
+			),
+		];
 		if (sessionStartNudgePending) {
 			sessionStartNudgePending = false;
 			reminders.push(wrapSystemReminder([

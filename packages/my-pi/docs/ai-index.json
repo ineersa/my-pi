@@ -1,0 +1,41 @@
+{
+  "spec": "my-pi.ai-docs/v1",
+  "package": "@ineersa/my-pi",
+  "version": "0.1.2",
+  "updatedAt": "2026-04-17",
+  "entities": [
+    {
+      "id": "my-pi-cli",
+      "kind": "cli",
+      "name": "my-pi",
+      "entry": "./bin/my-pi.mjs",
+      "docs": {
+        "settings": "docs/cli/my-pi/settings.md",
+        "usage": "docs/cli/my-pi/usage.md",
+        "maintenance": "docs/cli/my-pi/maintenance.md"
+      }
+    },
+    {
+      "id": "my-pi-theme-cli",
+      "kind": "cli",
+      "name": "my-pi-theme",
+      "entry": "./bin/theme.mjs",
+      "docs": {
+        "settings": "docs/cli/my-pi-theme/settings.md",
+        "usage": "docs/cli/my-pi-theme/usage.md",
+        "maintenance": "docs/cli/my-pi-theme/maintenance.md"
+      }
+    },
+    {
+      "id": "installer-package-list",
+      "kind": "installer-module",
+      "name": "INSTALLER_PACKAGES",
+      "entry": "./bin/package-list.mjs",
+      "docs": {
+        "settings": "docs/installer/package-list/settings.md",
+        "usage": "docs/installer/package-list/usage.md",
+        "maintenance": "docs/installer/package-list/maintenance.md"
+      }
+    }
+  ]
+}

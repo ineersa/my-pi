@@ -1,0 +1,30 @@
+{
+  "spec": "my-pi.ai-docs/v1",
+  "package": "@ineersa/my-pi-jetbrains-index",
+  "version": "0.1.2",
+  "updatedAt": "2026-04-17",
+  "entities": [
+    {
+      "id": "jetbrains-index",
+      "kind": "extension",
+      "name": "jetbrains-index",
+      "entry": "./extensions/jetbrains-index/jetbrains-index.ts",
+      "docs": {
+        "settings": "docs/extensions/jetbrains-index/settings.md",
+        "usage": "docs/extensions/jetbrains-index/usage.md",
+        "maintenance": "docs/extensions/jetbrains-index/maintenance.md"
+      },
+      "activation": {
+        "requiresIdeaDirectory": true,
+        "requiresJetBrainsMcpServer": true,
+        "mcpServerName": "jetbrains-index"
+      },
+      "behaviors": [
+        "Injects strict IDE-first policy reminders into system prompt",
+        "Blocks edit/write when IDE index remains in dumb mode after retries",
+        "Syncs changed files and reports only newly introduced diagnostics",
+        "Adds read-efficiency and non-symbolic exploration guardrails"
+      ]
+    }
+  ]
+}

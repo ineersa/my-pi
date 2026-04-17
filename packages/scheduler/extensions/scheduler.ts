@@ -112,6 +112,8 @@ type TaskMutationResult = {
 	error?: string;
 };
 
+const SCHEDULER_PACKAGE_DOCS_INDEX = path.resolve(__dirname, "..", "docs", "ai-index.json");
+
 // ── Runtime ─────────────────────────────────────────────────────────────────
 
 export class SchedulerRuntime {
@@ -1533,6 +1535,14 @@ export default function schedulerExtension(pi: ExtensionAPI) {
 	}
 
 	const runtime = new SchedulerRuntime(pi);
+
+	pi.on("before_agent_start", async (event) => {
+		const nudge = `Before changing behavior, read this package docs index: ${SCHEDULER_PACKAGE_DOCS_INDEX}; then read the target entity's settings.md + maintenance.md.`;
+		return {
+			systemPrompt: `${event.systemPrompt}\n\n${nudge}`,
+		};
+	});
+
 	registerEvents(pi, runtime);
 	registerCommands(pi, runtime);
 	registerTools(pi, runtime);

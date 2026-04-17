@@ -73,6 +73,28 @@ packages/
   my-pi/           # installer CLI
 ```
 
+## AI docs manifests
+
+Each package now ships a machine-readable docs index:
+
+- `packages/<package>/docs/ai-index.json`
+
+The index points to entity docs:
+
+- `settings.md` — configuration keys, defaults, and scope
+- `usage.md` — how to operate the extension/tool/theme/CLI
+- `maintenance.md` — invariants, safe edit workflow, and source-of-truth files
+
+Validate all packaged docs links with:
+
+```bash
+npm run docs:check
+```
+
+For minimal prompt impact in agent instructions, use a short pointer like:
+
+> Before changing behavior/settings, read the relevant package `docs/ai-index.json` and only that entity's `settings.md` + `maintenance.md`.
+
 ## Themes
 
 List available themes:

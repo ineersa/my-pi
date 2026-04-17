@@ -12,6 +12,7 @@
   },
   "files": [
     "extensions",
+    "docs",
     "README.md",
     "!**/*.test.ts"
   ],

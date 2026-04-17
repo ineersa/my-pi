@@ -15,6 +15,7 @@
     "bin",
     ".agents",
     "examples",
+    "docs",
     "README.md"
   ],
   "license": "MIT"
