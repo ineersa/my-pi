@@ -5,6 +5,7 @@
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { Key } from "@mariozechner/pi-tui";
 import { discoverAgents } from "./agent-registry.js";
+import { buildSubagentReportMessage } from "./reporting.js";
 import { SubagentsStatusComponent } from "./tui/subagents-status.js";
 
 const DEFAULT_UNNAMED_SESSION_ALIAS_PREFIX = "subagent-chat";
@@ -169,11 +170,7 @@ export async function executeAgentLaunch(
 					failRun(runId, result.error);
 				}
 
-				pi.sendMessage({
-					customType: "text",
-					content: formatResultSummary([result]),
-					display: true,
-				});
+				pi.sendMessage(buildSubagentReportMessage([result]));
 
 				if (ctx.hasUI) {
 					ctx.ui.notify(
@@ -223,11 +220,7 @@ export async function executeAgentLaunch(
 					failRun(runId);
 				}
 
-				pi.sendMessage({
-					customType: "text",
-					content: formatResultSummary(results),
-					display: true,
-				});
+				pi.sendMessage(buildSubagentReportMessage(results));
 
 				if (ctx.hasUI) {
 					const okCount = results.filter((r) => r.status === "ok").length;
@@ -274,30 +267,6 @@ function formatDuration(ms: number): string {
 	if (ms < 1000) return `${ms}ms`;
 	if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
 	return `${Math.floor(ms / 60000)}m${Math.floor((ms % 60000) / 1000)}s`;
-}
-
-function formatResultSummary(
-	results: import("./types.js").SubagentRunResult[],
-): string {
-	const lines: string[] = [];
-	for (const r of results) {
-		const icon = r.status === "ok" ? "✅" : "❌";
-		const duration = formatDuration(r.durationMs);
-		lines.push(`${icon} **${r.label}** (${duration} | interactive tmux)`);
-		if (r.tmuxPaneId) {
-			lines.push(
-				`   Pane: ${r.tmuxPaneId}${r.tmuxSessionName ? ` (${r.tmuxSessionName})` : ""}`,
-			);
-		}
-		if (r.report) {
-			lines.push(`   Report: ${r.report.replace(/\s+/g, " ").trim().slice(0, 220)}`);
-		}
-		if (r.error) {
-			lines.push(`   Error: ${r.error}`);
-		}
-		lines.push("");
-	}
-	return lines.join("\n").trimEnd();
 }
 
 async function openSubagentsStatusOverlay(ctx: ExtensionContext): Promise<void> {

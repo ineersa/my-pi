@@ -7,7 +7,7 @@
   ],
   "pi": {
     "extensions": [
-      "./extensions/jetbrains-index"
+      "./extensions/jetbrains-index/jetbrains-index.ts"
     ]
   },
   "files": [

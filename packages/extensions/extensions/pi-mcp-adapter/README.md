@@ -19,7 +19,7 @@ If a server requires auth, this build reports `needs-auth` and skips tool calls.
 
 This extension is already included via:
 
-- `packages/extensions/extensions/pi-mcp-adapter/index.ts`
+- `packages/extensions/extensions/pi-mcp-adapter/pi-mcp-adapter.ts`
 
 Then run:
 

@@ -8,19 +8,19 @@
   "license": "MIT",
   "pi": {
     "extensions": [
-      "./extensions/safe-guard",
+      "./extensions/safe-guard/safe-guard.ts",
       "./extensions/bg-process.ts",
       "./extensions/compact-header.ts",
       "./extensions/custom-footer.ts",
-      "./extensions/skill-palette",
-      "./extensions/rewind",
+      "./extensions/skill-palette/skill-palette.ts",
+      "./extensions/rewind/rewind.ts",
       "./extensions/session-status.ts",
       "./extensions/usage.ts",
-      "./extensions/pi-mcp-adapter/index.ts",
-      "./extensions/subagents-lite",
-      "./extensions/intercom",
-      "./extensions/custom-compaction",
-      "./extensions/output-cap"
+      "./extensions/pi-mcp-adapter/pi-mcp-adapter.ts",
+      "./extensions/subagents-lite/subagents-lite.ts",
+      "./extensions/intercom/intercom.ts",
+      "./extensions/custom-compaction/custom-compaction.ts",
+      "./extensions/output-cap/output-cap.ts"
     ]
   },
   "files": [

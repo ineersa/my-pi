@@ -14,8 +14,9 @@ A lean subagent extension for [pi-coding-agent](https://github.com/badlogic/pi-m
 - **Parallel launch** — run up to 4 subagents concurrently, including duplicates (e.g., 3 scouts).
 - **Status overlay** — `/subagents-status` shows active and recent runs, supports pane jump + control.
   - includes per-step skill diagnostics (`cfg / ok / missing`) for quick debugging.
-  - jump into a running pane with `enter`/`j` from status (`k` interrupt, `shift+k` kill pane, `m` mark done, `esc` close).
+  - jump into a running pane with `enter`/`j` from status (`r` toggle full report, `k` interrupt, `shift+k` kill pane, `m` mark done, `esc` close).
 - **LLM tool** — `launch_subagents` tool callable by the model.
+  - completion reports are rendered as expandable custom messages (click to expand full subagent replies).
 - **Startup inventory** — on session start, shows where agents were loaded from and warns about name conflicts (which source won).
 
 ## Commands

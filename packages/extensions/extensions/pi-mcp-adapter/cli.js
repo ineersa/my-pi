@@ -9,10 +9,10 @@ import { execSync } from "node:child_process";
 const REPO_URL = "https://raw.githubusercontent.com/nicobailon/pi-mcp-adapter/main";
 const EXT_DIR = path.join(os.homedir(), ".pi", "agent", "extensions", "pi-mcp-adapter");
 const SETTINGS_FILE = path.join(os.homedir(), ".pi", "agent", "settings.json");
-const EXT_PATH = "~/.pi/agent/extensions/pi-mcp-adapter/index.ts";
+const EXT_PATH = "~/.pi/agent/extensions/pi-mcp-adapter/pi-mcp-adapter.ts";
 
 const FILES = [
-  "index.ts",
+  "pi-mcp-adapter.ts",
   "types.ts",
   "config.ts",
   "server-manager.ts",
@@ -83,7 +83,7 @@ async function main() {
 
   const hasMcpExt = settings.extensions.some(p => 
     p === EXT_PATH || 
-    p.includes("/extensions/pi-mcp-adapter/index.ts") || 
+    p.includes("/extensions/pi-mcp-adapter/pi-mcp-adapter.ts") || 
     p.includes("/extensions/pi-mcp-adapter")
   );
 

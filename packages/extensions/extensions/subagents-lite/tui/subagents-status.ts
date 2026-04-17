@@ -4,7 +4,7 @@
 
 import type { Theme } from "@mariozechner/pi-coding-agent";
 import type { Component, TUI } from "@mariozechner/pi-tui";
-import { matchesKey, truncateToWidth } from "@mariozechner/pi-tui";
+import { matchesKey, truncateToWidth, wrapTextWithAnsi } from "@mariozechner/pi-tui";
 import type { RunSummary } from "../history/status-store.js";
 import { listRuns, markRunDone } from "../history/status-store.js";
 import { killPane, sendCtrlCToPane, switchClientToPane } from "../lib/tmux.js";
@@ -80,6 +80,7 @@ export class SubagentsStatusComponent implements Component {
 
 	private hintMessage = "";
 	private hintUntil = 0;
+	private expandedReportRuns = new Set<string>();
 
 	constructor(
 		private tui: TUI,
@@ -249,6 +250,18 @@ export class SubagentsStatusComponent implements Component {
 			return;
 		}
 
+		if (matchesKey(data, "r")) {
+			const run = this.selectedRun;
+			if (!run) return;
+			if (this.expandedReportRuns.has(run.runId)) {
+				this.expandedReportRuns.delete(run.runId);
+			} else {
+				this.expandedReportRuns.add(run.runId);
+			}
+			this.tui.requestRender();
+			return;
+		}
+
 		if (matchesKey(data, "up")) {
 			this.cursor = Math.max(0, this.cursor - 1);
 			this.ensureScrollVisible();
@@ -304,6 +317,7 @@ export class SubagentsStatusComponent implements Component {
 		if (scrollInfo) lines.push(row(this.theme.fg("dim", scrollInfo), w, this.theme));
 
 		if (selected) {
+			const reportExpanded = this.expandedReportRuns.has(selected.runId);
 			lines.push(row(this.theme.fg("accent", `Selected: ${selected.runId}`), w, this.theme));
 			if (selected.cwd) {
 				lines.push(
@@ -342,13 +356,52 @@ export class SubagentsStatusComponent implements Component {
 					);
 				}
 				if (step.report) {
-					lines.push(
-						row(
-							truncateToWidth(`     Report: ${step.report.replace(/\s+/g, " ")}`, innerW),
-							w,
-							this.theme,
-						),
-					);
+					const reportLineWidth = Math.max(10, innerW - 13);
+					const reportLines = step.report.replace(/\r\n/g, "\n").trimEnd().split("\n");
+					const reportChunks: string[] = [];
+					let truncated = false;
+
+					if (reportExpanded) {
+						for (const reportLine of reportLines) {
+							const wrapped = wrapTextWithAnsi(reportLine || " ", reportLineWidth);
+							if (wrapped.length === 0) {
+								reportChunks.push(" ");
+								continue;
+							}
+							reportChunks.push(...wrapped);
+						}
+					} else {
+						reportLoop: for (const reportLine of reportLines) {
+							const wrapped = wrapTextWithAnsi(reportLine || " ", reportLineWidth);
+							const chunks = wrapped.length > 0 ? wrapped : [" "];
+							for (const chunk of chunks) {
+								if (reportChunks.length >= 1) {
+									truncated = true;
+									break reportLoop;
+								}
+								reportChunks.push(chunk);
+							}
+						}
+					}
+
+					for (const chunk of reportChunks) {
+						lines.push(
+							row(
+								truncateToWidth(`     Report: ${chunk}`, innerW),
+								w,
+								this.theme,
+							),
+						);
+					}
+					if (!reportExpanded && truncated) {
+						lines.push(
+							row(
+								truncateToWidth("            ... more (press r)", innerW),
+								w,
+								this.theme,
+							),
+						);
+					}
 				}
 				const configuredSkills = step.configuredSkills ?? [];
 				const resolvedSkills = step.resolvedSkills ?? [];
@@ -377,7 +430,7 @@ export class SubagentsStatusComponent implements Component {
 
 		const active = this.rows.filter((r) => r.kind === "run" && r.run?.state === "running").length;
 		const recent = this.rows.filter((r) => r.kind === "run" && r.run?.state !== "running").length;
-		const footer = `↑↓ select  enter/j jump pane  k stop  shift+k kill pane  m mark done  esc/q close  ${active} active / ${recent} recent`;
+		const footer = `↑↓ select  enter/j jump pane  r toggle report  k stop  shift+k kill pane  m mark done  esc/q close  ${active} active / ${recent} recent`;
 		lines.push(renderFooter(footer, w, this.theme));
 		return lines;
 	}

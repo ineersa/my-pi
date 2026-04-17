@@ -30,13 +30,13 @@
   ],
   "pi": {
     "extensions": [
-      "./index.ts"
+      "./pi-mcp-adapter.ts"
     ],
     "video": "https://github.com/nicobailon/pi-mcp-adapter/raw/refs/heads/main/pi-mcp.mp4"
   },
   "files": [
     "cli.js",
-    "index.ts",
+    "pi-mcp-adapter.ts",
     "state.ts",
     "utils.ts",
     "tool-metadata.ts",

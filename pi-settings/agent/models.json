@@ -5,7 +5,7 @@
       "api": "openai-completions",
       "apiKey": "dummy",
       "compat": {
-        "supportsDeveloperRole": false,
+        "supportsDeveloperRole": true,
         "supportsReasoningEffort": false
       },
       "models": [
@@ -14,7 +14,7 @@
           "name": "flash",
           "reasoning": false,
           "input": ["text", "image"],
-          "contextWindow": 131000,
+          "contextWindow": 200000,
           "maxTokens": 65536,
           "cost": {
             "input": 0,

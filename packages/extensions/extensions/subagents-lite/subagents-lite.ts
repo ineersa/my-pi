@@ -18,6 +18,7 @@ import { Type } from "@sinclair/typebox";
 import { discoverAgents, discoverAgentsWithMetadata } from "./agent-registry.js";
 import type { AgentSource } from "./types.js";
 import { registerCommands } from "./commands.js";
+import { buildSubagentReportMessage } from "./reporting.js";
 import {
 	createRun,
 	getRunStatus,
@@ -31,6 +32,7 @@ import {
 	encodeSubagentIntercomEvent,
 } from "./lib/intercom-protocol.js";
 import { MAX_SUBAGENTS_PER_RUN } from "./types.js";
+import { registerSubagentReportMessageRenderer } from "./tui/subagent-report-message.js";
 
 const LaunchSubagentsParams = Type.Object({
 	agents: Type.Array(Type.String(), {
@@ -307,6 +309,7 @@ export default function subagentsLiteExtension(pi: ExtensionAPI): void {
 		}
 	});
 
+	registerSubagentReportMessageRenderer(pi);
 	registerCommands(pi);
 
 	pi.registerTool({
@@ -415,28 +418,6 @@ export default function subagentsLiteExtension(pi: ExtensionAPI): void {
 				{ sessionId: parentSessionId, sessionName: parentSessionName },
 			);
 
-			const formatResults = (
-				results: import("./types.js").SubagentRunResult[],
-			): string => {
-				const lines: string[] = [];
-				for (const r of results) {
-					const icon = r.status === "ok" ? "✅" : "❌";
-					lines.push(
-						`${icon} **${r.label}** (${(r.durationMs / 1000).toFixed(1)}s | interactive tmux)`,
-					);
-					if (r.tmuxPaneId) {
-						lines.push(
-							`   Pane: ${r.tmuxPaneId}${r.tmuxSessionName ? ` (${r.tmuxSessionName})` : ""}`,
-						);
-					}
-					if (r.report) {
-						lines.push(`   Report: ${r.report.replace(/\s+/g, " ").trim().slice(0, 220)}`);
-					}
-					if (r.error) lines.push(`   Error: ${r.error}`);
-				}
-				return lines.join("\n");
-			};
-
 			const runExecution = async (): Promise<import("./types.js").SubagentRunResult[]> => {
 				let results: import("./types.js").SubagentRunResult[];
 
@@ -477,11 +458,7 @@ export default function subagentsLiteExtension(pi: ExtensionAPI): void {
 			void (async () => {
 				try {
 					const results = await runExecution();
-					pi.sendMessage({
-						customType: "text",
-						content: formatResults(results),
-						display: true,
-					});
+					pi.sendMessage(buildSubagentReportMessage(results));
 				} catch (error) {
 					failRun(
 						runId,

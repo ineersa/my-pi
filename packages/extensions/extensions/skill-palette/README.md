@@ -38,7 +38,7 @@ Each skill must contain `SKILL.md` with frontmatter `name` + `description`.
 
 ## Theme config (optional)
 
-Create `theme.json` next to `index.ts` in this folder. You can start from `theme.example.json`.
+Create `theme.json` next to `skill-palette.ts` in this folder. You can start from `theme.example.json`.
 
 Fallback legacy path still supported:
 
