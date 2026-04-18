@@ -14,6 +14,7 @@ interface BgProcess {
 	startedAt: number;
 	finished: boolean;
 	exitCode: number | null;
+	stoppedByUser?: boolean;
 }
 
 function isAlive(pid: number): boolean {
@@ -183,6 +184,13 @@ export default function bgProcessExtension(pi: ExtensionAPI): void {
 
 				child.on("close", (code) => {
 					if (backgrounded) {
+						// Skip notification if the user already stopped this process
+						const proc = bgProcesses.get(childPid);
+						if (proc?.stoppedByUser) {
+							proc.finished = true;
+							proc.exitCode = code;
+							return;
+						}
 						finalizeBackgroundProcess(code);
 						return;
 					}
@@ -289,12 +297,22 @@ export default function bgProcessExtension(pi: ExtensionAPI): void {
 			}
 
 			if (action === "stop") {
+				const proc = bgProcesses.get(pid);
 				try {
+					if (proc) {
+						proc.stoppedByUser = true;
+					}
 					process.kill(pid, "SIGTERM");
-					bgProcesses.delete(pid);
+					if (proc) {
+						proc.finished = true;
+						proc.exitCode = null;
+					}
 					return { content: [{ type: "text", text: `Process ${pid} terminated.` }], details: {} };
 				} catch {
-					bgProcesses.delete(pid);
+					if (proc) {
+						proc.finished = true;
+						proc.exitCode = null;
+					}
 					return { content: [{ type: "text", text: `Process ${pid} not found (already stopped?).` }], details: {} };
 				}
 			}

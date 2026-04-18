@@ -29,7 +29,7 @@ import {
 } from "./lib/tmux.js";
 
 const TMUX_EXIT_MARKER = "__SUBAGENT_EXIT_CODE__:";
-const AUTO_CLOSE_PANE_DELAY_MS = 5000;
+const AUTO_CLOSE_PANE_DELAY_MS = 1000;
 
 function sleep(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));

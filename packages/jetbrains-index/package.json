@@ -17,6 +17,15 @@
     "!**/*.test.ts"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ineersa/my-pi.git",
+    "directory": "packages/jetbrains-index"
+  },
+  "homepage": "https://github.com/ineersa/my-pi/tree/main/packages/jetbrains-index#readme",
+  "bugs": {
+    "url": "https://github.com/ineersa/my-pi/issues"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.25.1"
   },
