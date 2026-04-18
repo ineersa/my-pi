@@ -125,4 +125,4 @@ export interface RunStatus {
 
 // ─── Constants ──────────────────────────────────────────────────────────
 
-export const MAX_SUBAGENTS_PER_RUN = 4;
+export const MAX_SUBAGENTS_PER_RUN = 1;

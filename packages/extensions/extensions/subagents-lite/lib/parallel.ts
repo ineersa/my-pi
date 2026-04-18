@@ -1,5 +1,7 @@
 /**
- * Parallel execution with hard cap of MAX_SUBAGENTS_PER_RUN (4).
+ * Parallel execution with hard cap of MAX_SUBAGENTS_PER_RUN.
+ * NOTE: This module is retained for internal/test use only.
+ * The launch_subagents tool and /run-agent command both enforce 1 agent per call.
  */
 
 import type { SubagentRunRequest, SubagentRunResult } from "../types.js";

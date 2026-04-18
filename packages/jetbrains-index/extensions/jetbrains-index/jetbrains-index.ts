@@ -23,6 +23,7 @@ import { ProblemsTracker } from "./problems-tracker.js";
 
 const SINGLETON_KEY = "__my_pi_jetbrains_index_owner__";
 const JETBRAINS_INDEX_PACKAGE_DOCS_INDEX = resolve(__dirname, "..", "..", "docs", "ai-index.json");
+const JETBRAINS_INDEX_ENTITY_NAME = "jetbrains-index";
 
 function getFilePathFromToolInput(input: Record<string, unknown>): string | null {
 	const candidates = [input.path, input.file_path, input.filePath, input.file];
@@ -289,7 +290,13 @@ export default function jetbrainsIndexExtension(pi: ExtensionAPI): void {
 		const reminders = [
 			wrapSystemReminder(buildSystemPromptPolicy(pi.getActiveTools())),
 			wrapSystemReminder(
-				`Before changing behavior, read this package docs index: ${JETBRAINS_INDEX_PACKAGE_DOCS_INDEX}; then read the target entity's settings.md + maintenance.md.`,
+				[
+					`Extension docs guard: only read ${JETBRAINS_INDEX_PACKAGE_DOCS_INDEX} and the target entity's settings.md + maintenance.md when:`,
+					`- You intend to modify the \"${JETBRAINS_INDEX_ENTITY_NAME}\" extension code or its settings.`,
+					"- The user asks about how to configure or use the jetbrains-index extension.",
+					"- The user asks about IDE index diagnostics, dumb-mode blocking, or read-efficiency guardrails.",
+					"Otherwise do NOT read these docs.",
+				].join("\n"),
 			),
 		];
 		if (sessionStartNudgePending) {

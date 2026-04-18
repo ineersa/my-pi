@@ -113,6 +113,7 @@ type TaskMutationResult = {
 };
 
 const SCHEDULER_PACKAGE_DOCS_INDEX = path.resolve(__dirname, "..", "docs", "ai-index.json");
+const SCHEDULER_ENTITY_NAMES = ["scheduler", "schedule_prompt"];
 
 // ── Runtime ─────────────────────────────────────────────────────────────────
 
@@ -1537,7 +1538,12 @@ export default function schedulerExtension(pi: ExtensionAPI) {
 	const runtime = new SchedulerRuntime(pi);
 
 	pi.on("before_agent_start", async (event) => {
-		const nudge = `Before changing behavior, read this package docs index: ${SCHEDULER_PACKAGE_DOCS_INDEX}; then read the target entity's settings.md + maintenance.md.`;
+		const nudge = [
+			`Extension docs guard: only read ${SCHEDULER_PACKAGE_DOCS_INDEX} and the target entity's settings.md + maintenance.md when:`,
+			`- You intend to modify the \"scheduler\" extension or \"schedule_prompt\" tool code or settings.`,
+			"- The user asks about how to configure or use the scheduler, recurring tasks, one-time reminders, or the schedule_prompt tool.",
+			"Otherwise do NOT read these docs.",
+		].join("\n");
 		return {
 			systemPrompt: `${event.systemPrompt}\n\n${nudge}`,
 		};

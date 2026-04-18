@@ -3,7 +3,7 @@
  *
  * Features:
  * - Predefined agents (scout, researcher, etc.) loaded from .md files
- * - Parallel launch of up to 4 subagents
+ * - Single-agent launch per tool call (orchestrator can issue multiple calls in parallel)
  * - Run history persisted for runtime coordination
  * - LLM-callable tool: launch_subagents
  */
@@ -31,30 +31,20 @@ import {
 	decodeSubagentIntercomEvent,
 	encodeSubagentIntercomEvent,
 } from "./lib/intercom-protocol.js";
-import { MAX_SUBAGENTS_PER_RUN } from "./types.js";
 import { registerSubagentReportMessageRenderer } from "./tui/subagent-report-message.js";
 
 const LaunchSubagentsParams = Type.Object({
 	agents: Type.Array(Type.String(), {
 		minItems: 1,
+		maxItems: 1,
 		description:
-			"Agent names to launch (duplicates allowed, e.g. ['scout','scout','researcher']). Max 4 total.",
+			"Exactly one agent name to launch per call (e.g. ['scout']). To run multiple agents, issue multiple tool calls (they may run in parallel).",
 	}),
 	task: Type.String({
-		description: "The task description for all agents.",
+		description: "The task description for the agent.",
 	}),
 	cwd: Type.Optional(
 		Type.String({ description: "Working directory (default: current cwd)" }),
-	),
-	parallel: Type.Optional(
-		Type.Boolean({
-			description: "Run agents in parallel (default: true)",
-		}),
-	),
-	maxConcurrency: Type.Optional(
-		Type.Number({
-			description: "Max concurrent agents, clamped 1-4 (default: 4)",
-		}),
 	),
 	modelOverride: Type.Optional(
 		Type.String({
@@ -68,8 +58,6 @@ interface LaunchParams {
 	agents: string[];
 	task: string;
 	cwd?: string;
-	parallel?: boolean;
-	maxConcurrency?: number;
 	modelOverride?: string;
 }
 
@@ -211,35 +199,87 @@ function registerChildLifecycleBridge(pi: ExtensionAPI): void {
 		});
 	};
 
+	// Track the latest assistant message text across turns so we can send
+	// it as the report once the full agentic loop completes.
+	// NOTE: We intentionally do NOT send on "turn_end" because that event
+	// fires per model API call (each turn in the agent loop), not after the
+	// full agentic loop completes. Sending on turn_end caused subagents to
+	// be killed mid-task when the model produced text alongside tool calls.
+	let lastReport = "";
+
 	pi.on("turn_end", (event) => {
+		const text = compactReport(extractMessageText(event.message));
+		if (text) lastReport = text;
+	});
+
+	pi.on("agent_end", (event) => {
 		if (finalEventSent) return;
-		const report = compactReport(extractMessageText(event.message));
-		if (!report) return;
-		sendEvent({
-			source: "subagents-lite",
-			version: 1,
-			kind: "report",
-			runId,
-			stepIndex,
-			label,
-			report,
-			timestamp: Date.now(),
-		});
+		// Extract the last assistant message from the full conversation.
+		// This is more reliable than turn_end because agent_end fires only
+		// after the complete agentic loop finishes.
+		let report = lastReport;
+		if (!report && Array.isArray(event.messages)) {
+			for (let i = event.messages.length - 1; i >= 0; i--) {
+				const text = extractMessageText(event.messages[i]);
+				if (text) {
+					report = text;
+					break;
+				}
+			}
+		}
+		if (report) {
+			sendEvent({
+				source: "subagents-lite",
+				version: 1,
+				kind: "report",
+				runId,
+				stepIndex,
+				label,
+				report,
+				timestamp: Date.now(),
+			});
+		} else {
+			sendEvent({
+				source: "subagents-lite",
+				version: 1,
+				kind: "error",
+				runId,
+				stepIndex,
+				label,
+				error: "Subagent completed but produced no report text.",
+				timestamp: Date.now(),
+			});
+		}
 		finalEventSent = true;
 	});
 
 	pi.on("session_shutdown", () => {
 		if (finalEventSent) return;
-		sendEvent({
-			source: "subagents-lite",
-			version: 1,
-			kind: "error",
-			runId,
-			stepIndex,
-			label,
-			error: "Subagent session ended before sending a final report.",
-			timestamp: Date.now(),
-		});
+		// Session is shutting down without completing the agentic loop.
+		// Send whatever report we have, or an error.
+		if (lastReport) {
+			sendEvent({
+				source: "subagents-lite",
+				version: 1,
+				kind: "report",
+				runId,
+				stepIndex,
+				label,
+				report: lastReport,
+				timestamp: Date.now(),
+			});
+		} else {
+			sendEvent({
+				source: "subagents-lite",
+				version: 1,
+				kind: "error",
+				runId,
+				stepIndex,
+				label,
+				error: "Subagent session ended before sending a final report.",
+				timestamp: Date.now(),
+			});
+		}
 		finalEventSent = true;
 	});
 }
@@ -311,8 +351,8 @@ export default function subagentsLiteExtension(pi: ExtensionAPI): void {
 
 	pi.registerTool({
 		name: "launch_subagents",
-		label: "Launch Subagents",
-		description: `Launch one or more subagents to work on a task in parallel. Subagents run in interactive tmux panes for live visibility and control. Max ${MAX_SUBAGENTS_PER_RUN} agents per call; duplicates allowed (e.g. 3 scouts). Use when the user says "use scout", "ask researcher", "launch scout and researcher", or "run a few scouts".`,
+		label: "Launch Subagent",
+		description: "Launch exactly one subagent for a task in an interactive tmux pane. For multiple agents, call this tool multiple times (those calls may run in parallel). Max 3 concurrent subagents globally. Use when the user says \"use scout\" or \"ask researcher\".",
 		parameters: LaunchSubagentsParams as any,
 		async execute(
 			_toolCallId: string,
@@ -335,12 +375,27 @@ export default function subagentsLiteExtension(pi: ExtensionAPI): void {
 					details: {},
 				};
 			}
-			if (agentNames.length > MAX_SUBAGENTS_PER_RUN) {
+			if (agentNames.length > 1) {
 				return {
 					content: [
 						{
 							type: "text",
-							text: `Error: Too many agents (${agentNames.length}). Maximum is ${MAX_SUBAGENTS_PER_RUN} per call.`,
+							text: `Error: launch_subagents accepts exactly 1 agent per call (received ${agentNames.length}). Call the tool multiple times to run multiple agents in parallel.`,
+						},
+					],
+					details: {},
+				};
+			}
+
+			// Enforce global concurrent cap
+			const { countRunningSubagents, MAX_CONCURRENT_SUBAGENTS } = await import("./history/status-store.js");
+			const runningCount = countRunningSubagents();
+			if (runningCount >= MAX_CONCURRENT_SUBAGENTS) {
+				return {
+					content: [
+						{
+							type: "text",
+							text: `Error: Cannot launch — ${runningCount} subagent${runningCount === 1 ? "" : "s"} already running (max ${MAX_CONCURRENT_SUBAGENTS}). Wait for one to finish or manage them in tmux.`,
 						},
 					],
 					details: {},
@@ -365,10 +420,9 @@ export default function subagentsLiteExtension(pi: ExtensionAPI): void {
 
 			const { randomUUID } = await import("node:crypto");
 			const { runSingleAgent } = await import("./runner.js");
-			const { runParallelAgents } = await import("./lib/parallel.js");
 
 			const runId = randomUUID().slice(0, 8);
-			const mode = agentNames.length === 1 ? "single" : "parallel";
+			const mode = "single";
 
 			const parentSessionId = ctx.sessionManager.getSessionId();
 			const parentSessionName = pi.getSessionName();
@@ -416,40 +470,19 @@ export default function subagentsLiteExtension(pi: ExtensionAPI): void {
 			);
 
 			const runExecution = async (): Promise<import("./types.js").SubagentRunResult[]> => {
-				let results: import("./types.js").SubagentRunResult[];
+				updateStep(runId, 0, { status: "running" });
+				const result = await runSingleAgent(requests[0]!);
+				updateStep(runId, 0, {
+					status: result.status === "ok" ? "ok" : "error",
+					durationMs: result.durationMs,
+					error: result.error,
+					report: result.report,
+					reportUpdatedAt: result.report ? Date.now() : undefined,
+				});
 
-				if (requests.length === 1) {
-					updateStep(runId, 0, { status: "running" });
-					const result = await runSingleAgent(requests[0]!);
-					updateStep(runId, 0, {
-						status: result.status === "ok" ? "ok" : "error",
-						durationMs: result.durationMs,
-						error: result.error,
-						report: result.report,
-						reportUpdatedAt: result.report ? Date.now() : undefined,
-					});
-					results = [result];
-				} else {
-					for (let i = 0; i < requests.length; i++) {
-						updateStep(runId, i, { status: "running" });
-					}
-					results = await runParallelAgents(requests);
-					for (let i = 0; i < results.length; i++) {
-						const r = results[i]!;
-						updateStep(runId, i, {
-							status: r.status === "ok" ? "ok" : "error",
-							durationMs: r.durationMs,
-							error: r.error,
-							report: r.report,
-							reportUpdatedAt: r.report ? Date.now() : undefined,
-						});
-					}
-				}
-
-				const allOk = results.every((r) => r.status === "ok");
-				if (allOk) completeRun(runId);
-				else failRun(runId);
-				return results;
+				if (result.status === "ok") completeRun(runId);
+				else failRun(runId, result.error);
+				return [result];
 			};
 
 			void (async () => {
@@ -475,9 +508,9 @@ export default function subagentsLiteExtension(pi: ExtensionAPI): void {
 					{
 						type: "text",
 						text:
-							`🚀 Started interactive subagents in tmux (${labels})\n` +
+							`🚀 Started interactive subagent in tmux (${labels})\n` +
 							`Run: ${runId}\n` +
-							"Started initial task in each pane. Pane auto-closes after a final report is captured. Manage live runs directly from tmux panes.",
+							"Started initial task in the pane. Pane auto-closes after a final report is captured. Manage live runs directly from tmux panes.",
 					},
 				],
 				details: {},

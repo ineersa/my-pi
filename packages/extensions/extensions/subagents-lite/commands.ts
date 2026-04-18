@@ -61,20 +61,30 @@ export async function executeAgentLaunch(
 	task: string,
 	modelOverride?: string,
 ): Promise<void> {
-	const { MAX_SUBAGENTS_PER_RUN } = await import("./types.js");
 	const { runSingleAgent } = await import("./runner.js");
-	const { runParallelAgents } = await import("./lib/parallel.js");
 	const {
 		createRun,
 		updateStep,
 		completeRun,
 		failRun,
+		countRunningSubagents,
+		MAX_CONCURRENT_SUBAGENTS,
 	} = await import("./history/status-store.js");
 	const { randomUUID } = await import("node:crypto");
 
-	if (agentNames.length > MAX_SUBAGENTS_PER_RUN) {
+	if (agentNames.length > 1) {
 		ctx.ui.notify(
-			`Too many agents (${agentNames.length}). Max is ${MAX_SUBAGENTS_PER_RUN}.`,
+			`Only 1 agent per /run-agent command (got ${agentNames.length}).`,
+			"error",
+		);
+		return;
+	}
+
+	// Enforce global concurrent cap
+	const runningCount = countRunningSubagents();
+	if (runningCount >= MAX_CONCURRENT_SUBAGENTS) {
+		ctx.ui.notify(
+			`Cannot launch — ${runningCount} subagent${runningCount === 1 ? "" : "s"} already running (max ${MAX_CONCURRENT_SUBAGENTS}). Wait for one to finish.`,
 			"error",
 		);
 		return;
@@ -82,151 +92,84 @@ export async function executeAgentLaunch(
 
 	const agents = discoverAgents(ctx.cwd);
 
-	// Validate all agent names
 	const parentSessionId = ctx.sessionManager.getSessionId();
 	const parentSessionName = pi.getSessionName();
 	const parentIntercomTarget =
 		parentSessionName?.trim() || defaultIntercomAlias(parentSessionId);
 
-	const requests = agentNames.map((name, index) => {
-		const agent = agents.find((a) => a.name === name);
-		if (!agent) {
-			throw new Error(
-				`Unknown agent: ${name}. Available: ${agents.map((a) => a.name).join(", ")}`,
-			);
-		}
-		// Label duplicates
-		const count = agentNames.slice(0, index + 1).filter((n) => n === name).length;
-		const label = count === 1 ? name : `${name}#${count}`;
-		return {
-			agent,
-			label,
-			index,
-			parentSessionId,
-			parentSessionName,
-			parentIntercomTarget,
-		};
-	});
+	const agent = agents.find((a) => a.name === agentNames[0]);
+	if (!agent) {
+		ctx.ui.notify(
+			`Unknown agent: ${agentNames[0]}. Available: ${agents.map((a) => a.name).join(", ")}`,
+			"error",
+		);
+		return;
+	}
+	const label = agent.name;
 
 	const runId = randomUUID().slice(0, 8);
-	const mode = requests.length === 1 ? "single" : "parallel";
 
-	// Create history entry
-	const steps = requests.map((r) => ({
-		agent: r.agent.name,
-		label: r.label,
-		status: "pending" as const,
-		runtime: "tmux" as const,
-		executionMode: "interactive" as const,
-		taskPreview: task.length > 140 ? `${task.slice(0, 137)}...` : task,
-		configuredSkills: r.agent.skills,
-	}));
 	createRun(
 		runId,
-		mode,
-		steps,
+		"single",
+		[{
+			agent: agent.name,
+			label,
+			status: "pending" as const,
+			runtime: "tmux" as const,
+			executionMode: "interactive" as const,
+			taskPreview: task.length > 140 ? `${task.slice(0, 137)}...` : task,
+			configuredSkills: agent.skills,
+		}],
 		ctx.cwd,
 		"interactive",
 		{ sessionId: parentSessionId, sessionName: parentSessionName },
 	);
 
 	if (ctx.hasUI) {
-		const agentList = requests.map((r) => r.label).join(", ");
-		ctx.ui.setStatus("subagent", `Running ${agentList}...`);
+		ctx.ui.setStatus("subagent", `Running ${label}...`);
 	}
 
 	const runExecution = async (): Promise<void> => {
 		try {
-			if (requests.length === 1) {
-				const r = requests[0]!;
-				updateStep(runId, 0, { status: "running" });
-				const result = await runSingleAgent({
-					agent: r.agent,
-					task,
-					cwd: ctx.cwd,
-					runId,
-					modelOverride,
-					index: 0,
-					label: r.label,
-					parentSessionId: r.parentSessionId,
-					parentSessionName: r.parentSessionName,
-					parentIntercomTarget: r.parentIntercomTarget,
-					runtime: "tmux",
-					executionMode: "interactive",
-				});
-				updateStep(runId, 0, {
-					status: result.status === "ok" ? "ok" : "error",
-					durationMs: result.durationMs,
-					error: result.error,
-					report: result.report,
-					reportUpdatedAt: result.report ? Date.now() : undefined,
-				});
+			updateStep(runId, 0, { status: "running" });
+			const result = await runSingleAgent({
+				agent,
+				task,
+				cwd: ctx.cwd,
+				runId,
+				modelOverride,
+				index: 0,
+				label,
+				parentSessionId,
+				parentSessionName,
+				parentIntercomTarget,
+				runtime: "tmux",
+				executionMode: "interactive",
+			});
+			updateStep(runId, 0, {
+				status: result.status === "ok" ? "ok" : "error",
+				durationMs: result.durationMs,
+				error: result.error,
+				report: result.report,
+				reportUpdatedAt: result.report ? Date.now() : undefined,
+			});
 
-				if (result.status === "ok") {
-					completeRun(runId);
-				} else {
-					failRun(runId, result.error);
-				}
-
-				pi.sendMessage(buildSubagentReportMessage([result]));
-
-				if (ctx.hasUI) {
-					ctx.ui.notify(
-						result.status === "ok"
-							? `${r.label} finished (${formatDuration(result.durationMs)})`
-							: `${r.label} stopped: ${result.error ?? "unknown error"}`,
-						result.status === "ok" ? "info" : "warning",
-					);
-				}
+			if (result.status === "ok") {
+				completeRun(runId);
 			} else {
-				for (let i = 0; i < requests.length; i++) {
-					updateStep(runId, i, { status: "running" });
-				}
+				failRun(runId, result.error);
+			}
 
-				const results = await runParallelAgents(
-					requests.map((r) => ({
-						agent: r.agent,
-						task,
-						cwd: ctx.cwd,
-						runId,
-						modelOverride,
-						index: r.index,
-						label: r.label,
-						parentSessionId: r.parentSessionId,
-						parentSessionName: r.parentSessionName,
-						parentIntercomTarget: r.parentIntercomTarget,
-						runtime: "tmux",
-						executionMode: "interactive",
-					})),
+			pi.sendMessage(buildSubagentReportMessage([result]));
+
+			if (ctx.hasUI) {
+				ctx.ui.notify(
+					result.status === "ok"
+						? `${label} finished (${formatDuration(result.durationMs)})`
+						: `${label} stopped: ${result.error ?? "unknown error"}`,
+					result.status === "ok" ? "info" : "warning",
 				);
-
-				for (let i = 0; i < results.length; i++) {
-					const r = results[i]!;
-					updateStep(runId, i, {
-						status: r.status === "ok" ? "ok" : "error",
-						durationMs: r.durationMs,
-						error: r.error,
-						report: r.report,
-						reportUpdatedAt: r.report ? Date.now() : undefined,
-					});
-				}
-
-				const allOk = results.every((r) => r.status === "ok");
-				if (allOk) {
-					completeRun(runId);
-				} else {
-					failRun(runId);
-				}
-
-				pi.sendMessage(buildSubagentReportMessage(results));
-
-				if (ctx.hasUI) {
-					const okCount = results.filter((r) => r.status === "ok").length;
-					ctx.ui.notify(
-						`Interactive run: ${okCount}/${results.length} finished cleanly`,
-						allOk ? "info" : "warning",
-					);
-				}
 			}
 		} catch (error) {
 			failRun(
@@ -247,13 +190,12 @@ export async function executeAgentLaunch(
 	};
 
 	void runExecution();
-	const labels = requests.map((r) => r.label).join(", ");
 	pi.sendMessage({
 		customType: "text",
 		content:
-			`🚀 Started interactive subagents in tmux (${labels})\n` +
+			`🚀 Started interactive subagent in tmux (${label})\n` +
 			`Run: ${runId}\n` +
-			"Started initial task in each pane. Pane auto-closes after a final report is captured. Manage live runs directly from tmux panes.",
+			"Started initial task in the pane. Pane auto-closes after a final report is captured. Manage live runs directly from tmux panes.",
 		display: true,
 	});
 	if (ctx.hasUI) {

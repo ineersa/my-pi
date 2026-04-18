@@ -237,6 +237,26 @@ export function listRuns(limit: number = 20): RunSummary[] {
 	return runs.slice(0, limit);
 }
 
+// ─── Constants ──────────────────────────────────────────────────────────
+
+/** Max number of subagents that may be running simultaneously. */
+export const MAX_CONCURRENT_SUBAGENTS = 3;
+
+/** Count currently running subagent steps across all active runs. */
+export function countRunningSubagents(): number {
+	const runs = listRuns(100);
+	let count = 0;
+	for (const run of runs) {
+		if (run.state !== "running") continue;
+		for (const step of run.steps) {
+			if (step.status === "running" || step.status === "pending") {
+				count++;
+			}
+		}
+	}
+	return count;
+}
+
 export function getRunsRoot(): string {
 	return RUNS_ROOT;
 }

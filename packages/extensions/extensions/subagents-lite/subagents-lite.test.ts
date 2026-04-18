@@ -99,7 +99,7 @@ describe("shellQuote", () => {
 // ─── Parallel cap enforcement ───────────────────────────────────────────
 
 describe("MAX_SUBAGENTS_PER_RUN", () => {
-	it("is 4", () => {
-		expect(MAX_SUBAGENTS_PER_RUN).toBe(4);
+	it("is 1", () => {
+		expect(MAX_SUBAGENTS_PER_RUN).toBe(1);
 	});
 });

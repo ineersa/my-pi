@@ -1,17 +1,17 @@
 # subagents-lite
 
-A lean subagent extension for [pi-coding-agent](https://github.com/badlogic/pi-mono). Launch predefined agents (scout, researcher, etc.) as isolated subagent runs, individually or in parallel (up to 4), with interactive tmux panes.
+A lean subagent extension for [pi-coding-agent](https://github.com/badlogic/pi-mono). Launch predefined agents (scout, researcher, etc.) as isolated subagent runs in interactive tmux panes. Each `launch_subagents` tool call launches exactly one agent; orchestrators can still issue multiple calls in parallel.
 
 ## What's included
 
 - **Agent discovery** — builtin agents ship with the extension; users can override or add agents via `~/.agents/`, `~/.pi/agent/agents/`, or `.pi/agents/` (project-local, highest priority).
-- **interactive tmux runtime** — subagents run in sidecar tmux panes split from your current pane; parallel runs stack vertically (up to 4).
+- **interactive tmux runtime** — subagents run in sidecar tmux panes split from your current pane; multiple concurrent runs stack vertically.
   - panes auto-close once a final report is captured.
   - each pane starts pi with an initial task message so the task kicks off immediately.
   - child subagent sessions keep extensions enabled (safe-guard still works), but scheduler is disabled in child runs via `PI_SUBAGENT_DISABLE_SCHEDULER=1`.
   - child turn completion sends a structured intercom event to the parent session; parent updates run status immediately, even while tmux panes remain open.
   - intercom is required for subagent parent/child communication and is shipped in this extension bundle.
-- **Parallel launch** — run up to 4 subagents concurrently, including duplicates (e.g., 3 scouts).
+- **One-per-call launch tool** — `launch_subagents` accepts exactly one agent per call. Multiple calls may run concurrently.
 - **tmux-native control** — active runs are managed directly in tmux panes (attach, interrupt, kill).
 - **LLM tool** — `launch_subagents` tool callable by the model.
   - completion reports are rendered as expandable custom messages (click to expand full subagent replies).
@@ -25,9 +25,9 @@ A lean subagent extension for [pi-coding-agent](https://github.com/badlogic/pi-m
 
 The model can call this tool directly. Parameters:
 
-- `agents` (string[], required) — agent names to launch. Duplicates allowed. Max 4.
+- `agents` (string[], required) — exactly one agent name to launch (single-item array).
 - `task` (string, required) — task description.
-- `modelOverride` (string, optional) — override model for all agents.
+- `modelOverride` (string, optional) — override model for the launched agent.
 - `cwd` (string, optional) — working directory.
 
 ## Agent file format
@@ -70,7 +70,8 @@ When the same agent name exists in multiple sources:
 
 ## Limits
 
-- **Max 4 concurrent launches** per call (hard cap)
+- **One launch per tool call** (`launch_subagents` enforces exactly one agent in `agents`)
+- **Max 3 concurrent subagents** globally (hard cap to avoid intercom contention and unreadable tmux splits)
 - No forced timeout in interactive mode (run ends when pi exits, pane is killed, or you mark done)
 - Subagent depth guard: respects `PI_SUBAGENT_DEPTH` / `PI_SUBAGENT_MAX_DEPTH` env vars
 - tmux runtime requires `tmux` available on PATH

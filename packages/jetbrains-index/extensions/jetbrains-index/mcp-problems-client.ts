@@ -1,8 +1,10 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import {
+	IDE_INDEX_STATUS_LAST_ATTEMPT_TIMEOUT_MS,
 	IDE_INDEX_STATUS_MAX_RETRIES,
-	IDE_INDEX_STATUS_RETRY_DELAY_MS,
+	IDE_INDEX_STATUS_RETRY_BASE_DELAY_MS,
+	IDE_INDEX_STATUS_RETRY_MAX_DELAY_MS,
 	MCP_CONNECT_TIMEOUT_MS,
 	MCP_MAX_RETRIES,
 	MCP_RECONNECT_DELAY_MS,
@@ -445,14 +447,32 @@ export class McpProblemsClient {
 		}
 	}
 
+
 	async waitForIndexReady(projectPath: string): Promise<IndexReadinessResult> {
+		let lastMessage = "Unable to query IDE index status.";
+
 		for (let attempt = 1; attempt <= IDE_INDEX_STATUS_MAX_RETRIES; attempt++) {
-			const status = await this.getIndexStatus(projectPath);
+			const isLastAttempt = attempt === IDE_INDEX_STATUS_MAX_RETRIES;
+			const status = await this.getIndexStatus(projectPath, isLastAttempt);
+
 			if (!status) {
+				// Retry on null (malformed / call failure) with exponential backoff
+				if (!isLastAttempt) {
+					const delay = Math.min(
+						IDE_INDEX_STATUS_RETRY_BASE_DELAY_MS * 2 ** (attempt - 1),
+						IDE_INDEX_STATUS_RETRY_MAX_DELAY_MS,
+					);
+					this.notify(
+						`IDE index status unavailable (attempt ${attempt}/${IDE_INDEX_STATUS_MAX_RETRIES}). Retrying in ${delay / 1000}s…`,
+						"warning",
+					);
+					await this.sleep(delay);
+					continue;
+				}
 				return {
 					ready: false,
 					attempts: attempt,
-					message: "Unable to query IDE index status.",
+					message: lastMessage,
 				};
 			}
 
@@ -463,12 +483,16 @@ export class McpProblemsClient {
 				};
 			}
 
-			if (attempt < IDE_INDEX_STATUS_MAX_RETRIES) {
+			if (!isLastAttempt) {
+				const delay = Math.min(
+					IDE_INDEX_STATUS_RETRY_BASE_DELAY_MS * 2 ** (attempt - 1),
+					IDE_INDEX_STATUS_RETRY_MAX_DELAY_MS,
+				);
 				this.notify(
-					`IDE index is busy (attempt ${attempt}/${IDE_INDEX_STATUS_MAX_RETRIES}). Waiting ${IDE_INDEX_STATUS_RETRY_DELAY_MS / 1000}s…`,
+					`IDE index is busy (attempt ${attempt}/${IDE_INDEX_STATUS_MAX_RETRIES}). Waiting ${delay / 1000}s…`,
 					"warning",
 				);
-				await this.sleep(IDE_INDEX_STATUS_RETRY_DELAY_MS);
+				await this.sleep(delay);
 			}
 		}
 
@@ -513,10 +537,10 @@ export class McpProblemsClient {
 		return problems.map((problem) => problemToDiagnostic(problem));
 	}
 
-	private async getIndexStatus(projectPath: string): Promise<{ isDumbMode: boolean; isIndexing: boolean } | null> {
+	private async getIndexStatus(projectPath: string, extendedTimeout = false): Promise<{ isDumbMode: boolean; isIndexing: boolean } | null> {
 		const call = await this.callToolWithRetry("indexStatus", {
 			project_path: projectPath,
-		});
+		}, extendedTimeout);
 		if (!call.ok) {
 			this.notify(`Failed to query IDE index status: ${call.error ?? "unknown error"}`, "error");
 			return null;
@@ -531,7 +555,7 @@ export class McpProblemsClient {
 		return status;
 	}
 
-	private async callToolWithRetry(toolKey: ToolKey, args: Record<string, unknown>): Promise<CallResult> {
+	private async callToolWithRetry(toolKey: ToolKey, args: Record<string, unknown>, extendedTimeout = false): Promise<CallResult> {
 		let lastError: Error | null = null;
 
 		for (let attempt = 1; attempt <= MCP_MAX_RETRIES; attempt++) {
@@ -542,9 +566,12 @@ export class McpProblemsClient {
 				}
 
 				const toolName = this.toolCatalog[toolKey];
+				const timeout = extendedTimeout && attempt === MCP_MAX_RETRIES
+					? IDE_INDEX_STATUS_LAST_ATTEMPT_TIMEOUT_MS
+					: MCP_TOOL_CALL_TIMEOUT_MS;
 				const result = await this.withTimeout(
 					this.client.callTool({ name: toolName, arguments: args }),
-					MCP_TOOL_CALL_TIMEOUT_MS,
+					timeout,
 					`Timed out waiting for MCP response (${toolName})`,
 				);
 				return { ok: true, result };

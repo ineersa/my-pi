@@ -6,7 +6,7 @@ Commands:
 
 Tool:
 
-- `launch_subagents` (max 4 agents, duplicates allowed)
+- `launch_subagents` (exactly 1 agent per call; run multiple calls in parallel if needed)
 
 Runs execute in tmux panes and report back to the parent session.
 

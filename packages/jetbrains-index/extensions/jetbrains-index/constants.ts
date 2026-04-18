@@ -35,10 +35,16 @@ export const MCP_CONNECT_TIMEOUT_MS = 30_000;
 export const MCP_RECONNECT_DELAY_MS = 3_000;
 
 /** Index readiness checks before edit/write: retry count when IDE is in dumb/indexing mode. */
-export const IDE_INDEX_STATUS_MAX_RETRIES = 3;
+export const IDE_INDEX_STATUS_MAX_RETRIES = 5;
 
-/** Delay between index readiness retries. */
-export const IDE_INDEX_STATUS_RETRY_DELAY_MS = 5_000;
+/** Base delay between index readiness retries; doubles each attempt (exponential backoff). */
+export const IDE_INDEX_STATUS_RETRY_BASE_DELAY_MS = 2_000;
+
+/** Maximum delay cap for index readiness retries. */
+export const IDE_INDEX_STATUS_RETRY_MAX_DELAY_MS = 30_000;
+
+/** Timeout for individual index status tool calls on the last retry attempt. */
+export const IDE_INDEX_STATUS_LAST_ATTEMPT_TIMEOUT_MS = 30_000;
 
 /** Consider reads above this many lines as large for read-efficiency enforcement. */
 export const LARGE_READ_LINE_THRESHOLD = 200;

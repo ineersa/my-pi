@@ -2,6 +2,21 @@ import { resolve } from "node:path";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 
 const EXTENSIONS_PACKAGE_DOCS_INDEX = resolve(__dirname, "..", "docs", "ai-index.json");
+const EXTENSIONS_ENTITY_NAMES = [
+	"safe-guard",
+	"bg-process",
+	"compact-header",
+	"custom-footer",
+	"skill-palette",
+	"rewind",
+	"session-status",
+	"usage",
+	"pi-mcp-adapter",
+	"subagents-lite",
+	"intercom",
+	"custom-compaction",
+	"output-cap",
+];
 
 export default function sessionStatusExtension(pi: ExtensionAPI): void {
   pi.on("session_start", async (event, ctx) => {
@@ -17,7 +32,12 @@ export default function sessionStatusExtension(pi: ExtensionAPI): void {
   });
 
   pi.on("before_agent_start", async (event) => {
-    const nudge = `Before changing behavior, read this package docs index: ${EXTENSIONS_PACKAGE_DOCS_INDEX}; then read the target entity's settings.md + maintenance.md.`;
+    const nudge = [
+      `Extension docs guard: only read ${EXTENSIONS_PACKAGE_DOCS_INDEX} and the target entity's settings.md + maintenance.md when:`,
+      `- You intend to modify one of these extensions: ${EXTENSIONS_ENTITY_NAMES.join(", ")}.`,
+      "- The user asks about how to configure or use one of these extensions.",
+      "Otherwise do NOT read these docs.",
+    ].join("\n");
     return {
       systemPrompt: `${event.systemPrompt}\n\n${nudge}`,
     };
