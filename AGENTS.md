@@ -148,3 +148,4 @@ When working with this codebase:
   - [Extensions ai-index](packages/extensions/docs/ai-index.json)
   - [Scheduler ai-index](packages/scheduler/docs/ai-index.json)
   - [JetBrains Index ai-index](packages/jetbrains-index/docs/ai-index.json)
+

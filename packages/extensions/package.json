@@ -1,6 +1,6 @@
 {
   "name": "@ineersa/my-pi-extensions",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Personal extension bundle for pi-coding-agent",
   "keywords": [
     "pi-package"

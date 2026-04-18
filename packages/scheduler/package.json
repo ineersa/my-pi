@@ -1,6 +1,6 @@
 {
   "name": "@ineersa/my-pi-scheduler",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Scheduler extension for pi: recurring checks, one-time reminders, and the LLM-callable schedule_prompt tool.",
   "keywords": [
     "pi-package"
