@@ -26,6 +26,7 @@ import {
 	updateStep,
 	completeRun,
 	failRun,
+	purgeOldRuns,
 } from "./history/status-store.js";
 import {
 	decodeSubagentIntercomEvent,
@@ -306,6 +307,18 @@ export default function subagentsLiteExtension(pi: ExtensionAPI): void {
 	pi.on("turn_start", (_event, ctx) => {
 		syncLocalSessionId(ctx.sessionManager.getSessionId());
 	});
+
+	// Clean up old run data when this parent session ends.
+	// Only runs in parent sessions (not subagent children).
+	if (process.env.PI_SUBAGENT_CHILD !== "1") {
+		pi.on("session_shutdown", () => {
+			try {
+				purgeOldRuns();
+			} catch {
+				// Best-effort cleanup
+			}
+		});
+	}
 
 	pi.events.on(INTERCOM_READY_EVENT, (payload) => {
 		if (!payload || typeof payload !== "object") return;

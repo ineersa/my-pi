@@ -5,10 +5,108 @@
  *   ~/.pi/agent/extensions/subagents-lite/runs/<runId>/status.json
  */
 
+import * as child_process from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { RunStatus, RunStatusStep, SubagentExecutionMode } from "../types.js";
+
+// ─── Stale-run reaping ────────────────────────────────────────────────
+
+/** Runs with no update for longer than this are considered dead. */
+const STALE_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
+
+/**
+ * Check whether a tmux pane still exists.
+ * Uses spawnSync directly (inlined to avoid circular dep on tmux helper).
+ */
+function tmuxPaneExists(paneId: string | undefined): boolean {
+	if (!paneId) return false;
+	try {
+		const res = child_process.spawnSync("tmux", ["display-message", "-p", "-t", paneId, "#{pane_id}"], {
+			encoding: "utf8",
+			timeout: 3000,
+		});
+		return res.status === 0 && (res.stdout ?? "").trim() === paneId;
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Reap stale runs whose tmux panes are all dead (or that have had no
+ * update for longer than STALE_THRESHOLD_MS and have no live panes).
+ *
+ * This is called lazily before listRuns/countRunningSubagents so that
+ * orphaned runs from crashed parent sessions never block new launches.
+ *
+ * @returns number of runs reaped
+ */
+export function reapStaleRuns(): number {
+	let entries: string[];
+	try {
+		entries = fs
+			.readdirSync(RUNS_ROOT)
+			.filter((e) =>
+				fs.statSync(path.join(RUNS_ROOT, e)).isDirectory(),
+			);
+	} catch {
+		return 0;
+	}
+
+	let reaped = 0;
+	const now = Date.now();
+
+	for (const entry of entries) {
+		const status = readJson(
+			path.join(RUNS_ROOT, entry, "status.json"),
+		) as RunStatus | null;
+		if (!status || status.state !== "running") continue;
+
+		// Check if any step still has a live tmux pane
+		let hasLivePane = false;
+		for (const step of status.steps) {
+			if (step.status !== "running" && step.status !== "pending") continue;
+			if (step.tmuxPaneId && tmuxPaneExists(step.tmuxPaneId)) {
+				hasLivePane = true;
+				break;
+			}
+		}
+
+		if (hasLivePane) continue;
+
+		// No live panes — is the run stale by time?
+		const ageSinceUpdate = now - (status.lastUpdate ?? status.startedAt);
+		const isOld = ageSinceUpdate >= STALE_THRESHOLD_MS;
+
+		// If we have pane IDs but they're all dead, reap immediately
+		// regardless of time threshold (the panes are gone = the run is dead).
+		const hasAnyPaneId = status.steps.some(
+			(s) =>
+				(s.status === "running" || s.status === "pending") &&
+				s.tmuxPaneId,
+		);
+
+		if (!hasAnyPaneId && !isOld) continue;
+
+		// Reap: mark as failed
+		const now2 = Date.now();
+		status.state = "failed";
+		status.lastUpdate = now2;
+		status.endedAt = now2;
+		for (const step of status.steps) {
+			if (step.status === "running" || step.status === "pending") {
+				step.status = "error";
+				step.error ??= "Run orphaned (parent session exited or tmux pane destroyed)";
+				step.durationMs ??= Math.max(0, now2 - status.startedAt);
+			}
+		}
+		writeJson(statusPath(entry), status);
+		reaped++;
+	}
+
+	return reaped;
+}
 
 const RUNS_ROOT = path.join(
 	os.homedir(),
@@ -180,8 +278,10 @@ export interface RunSummary {
 
 /**
  * List recent runs sorted by state priority then time.
+ * Reaps stale/orphaned runs first so they never appear as "running".
  */
 export function listRuns(limit: number = 20): RunSummary[] {
+	reapStaleRuns();
 	let entries: string[];
 	try {
 		entries = fs
@@ -259,4 +359,68 @@ export function countRunningSubagents(): number {
 
 export function getRunsRoot(): string {
 	return RUNS_ROOT;
+}
+
+// ─── Run data cleanup ──────────────────────────────────────────────────
+
+/** Keep this many completed/failed runs on disk (newer ones win). */
+const PURGE_KEEP_COUNT = 20;
+
+/** Runs younger than this are never purged. */
+const PURGE_MIN_AGE_MS = 10 * 60 * 1000; // 10 minutes
+
+/**
+ * Delete old completed/failed run directories to free disk space.
+ * Keeps the most recent PURGE_KEEP_COUNT finished runs.
+ * Never touches still-running runs (reapStaleRuns handles those).
+ *
+ * @returns number of runs purged
+ */
+export function purgeOldRuns(): number {
+	let entries: string[];
+	try {
+		entries = fs
+			.readdirSync(RUNS_ROOT)
+			.filter((e) =>
+				fs.statSync(path.join(RUNS_ROOT, e)).isDirectory(),
+			);
+	} catch {
+		return 0;
+	}
+
+	const now = Date.now();
+
+	// Collect finished runs with timestamps
+	type Finished = { id: string; endedAt: number };
+	const finished: Finished[] = [];
+
+	for (const entry of entries) {
+		const status = readJson(
+			path.join(RUNS_ROOT, entry, "status.json"),
+		) as RunStatus | null;
+		if (!status) {
+			// No status.json → orphan directory, always eligible
+			finished.push({ id: entry, endedAt: 0 });
+			continue;
+		}
+		if (status.state === "running") continue; // reapStaleRuns handles these
+		const endedAt = status.endedAt ?? status.lastUpdate ?? status.startedAt;
+		if (now - endedAt < PURGE_MIN_AGE_MS) continue; // too recent
+		finished.push({ id: entry, endedAt });
+	}
+
+	// Sort newest first, keep top N, delete the rest
+	finished.sort((a, b) => b.endedAt - a.endedAt);
+	const toDelete = finished.slice(PURGE_KEEP_COUNT);
+
+	for (const { id } of toDelete) {
+		const dir = path.join(RUNS_ROOT, id);
+		try {
+			fs.rmSync(dir, { recursive: true, force: true });
+		} catch {
+			// Best-effort; may fail if files are locked
+		}
+	}
+
+	return toDelete.length;
 }

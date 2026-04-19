@@ -16,6 +16,7 @@ import type { AssistantMessage } from "@mariozechner/pi-ai";
 import type { ExtensionAPI, ExtensionContext, ReadonlyFooterDataProvider } from "@mariozechner/pi-coding-agent";
 import { truncateToWidth } from "@mariozechner/pi-tui";
 import { getSafeModeState, subscribeSafeMode } from "./runtime-mode";
+import { getToolStats, handleToolCall, resetToolStats } from "./tool-stats.js";
 
 /** OSC 8 hyperlink: renders `text` as a clickable terminal link to `url`. */
 export function hyperlink(url: string, text: string): string {
@@ -95,6 +96,15 @@ export function collectFooterUsageTotals(ctx: Pick<ExtensionContext, "sessionMan
 export default function (pi: ExtensionAPI) {
 	/** Timestamp of the current session start, used for elapsed time. */
 	let sessionStart = Date.now();
+
+	// ─── Tool stats tracking ──────────────────────────────────────────
+	pi.on("tool_call", (event) => {
+		handleToolCall(event);
+	});
+
+	pi.on("session_start", () => {
+		resetToolStats();
+	});
 	/** Cached assistant usage totals to avoid rescanning the full session on every render. */
 	let usageTotals: FooterUsageTotals = { input: 0, output: 0, cost: 0 };
 	/** Cached PR info for the current branch. */
@@ -237,6 +247,18 @@ export default function (pi: ExtensionAPI) {
 					if (branchStr) {
 						leftParts.push(branchStr);
 					}
+					// ── Tool stats ──────────────────────────────────────────
+					const ts = getToolStats();
+					const readPct =
+						ts.reads > 0 ? ((ts.readsUnbounded / ts.reads) * 100).toFixed(0) : "0";
+					leftParts.push(
+						theme.fg("accent", `Reads: ${ts.reads} / ${readPct}% unbounded`),
+						theme.fg("success", `IDE: ${ts.ideToolCalls}`),
+					);
+					if (ts.readsToon > 0) {
+						leftParts.push(theme.fg("warning", `TOON: ${ts.readsToon}`));
+					}
+
 					const left = leftParts.join(sep);
 
 					return [truncateToWidth(left, width)];
@@ -369,6 +391,25 @@ export default function (pi: ExtensionAPI) {
 			const prLink = hyperlink(cachedPr.url, `#${cachedPr.number}`);
 			lines.push(
 				`  ${theme.fg("accent", "Pull Request")}${sep}${theme.fg("success", prLink)}${sep}${theme.fg("dim", cachedPr.url)}`,
+			);
+		}
+		lines.push("");
+
+		// ── Tool stats ──
+		lines.push(`  ${divider}`);
+		const ts = getToolStats();
+		const readPct =
+			ts.reads > 0 ? ((ts.readsUnbounded / ts.reads) * 100).toFixed(0) : "0";
+		lines.push(`  ${theme.fg("accent", "Tool Stats")}`);
+		lines.push(
+			`  ${theme.fg("dim", "reads".padEnd(24))}${theme.fg("accent", `${ts.reads} total`)}${sep}${theme.fg("warning", `${readPct}% unbounded`)}${sep}${theme.fg("dim", `${ts.reads - ts.readsUnbounded} bounded`)}`,
+		);
+		lines.push(
+			`  ${theme.fg("dim", "ide tools".padEnd(24))}${theme.fg("success", `${ts.ideToolCalls} calls`)}`,
+		);
+		if (ts.readsToon > 0) {
+			lines.push(
+				`  ${theme.fg("dim", "toon reads".padEnd(24))}${theme.fg("warning", `${ts.readsToon}`)}`,
 			);
 		}
 		lines.push("");
