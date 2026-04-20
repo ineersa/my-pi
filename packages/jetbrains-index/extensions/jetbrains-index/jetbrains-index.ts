@@ -35,6 +35,52 @@ function getFilePathFromToolInput(input: Record<string, unknown>): string | null
 	return null;
 }
 
+// Extensions for languages with AST/symbol support in JetBrains IDEs.
+// Config/data formats (.json, .yaml, .xml, .html, .css, etc.) are excluded
+// because IDE index tools do not provide semantic navigation for them.
+const CODE_FILE_EXTENSIONS = new Set([
+	".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts",
+	".py", ".pyw", ".pyi",
+	".php",
+	".java", ".kt", ".kts", ".groovy",
+	".c", ".h", ".cpp", ".hpp", ".cc", ".cxx", ".c++", ".hxx",
+	".cs", ".csx",
+	".go",
+	".rs",
+	".rb", ".rake", ".gemspec",
+	".swift",
+	".scala", ".sbt",
+	".r", ".R",
+	".lua",
+	".pl", ".pm",
+	".sh", ".bash", ".zsh", ".fish",
+	".ps1", ".psm1",
+	".sql",
+	".graphql", ".gql",
+	".proto",
+	".dart",
+	".zig",
+	".nim", ".nims",
+	".ex", ".exs",
+	".erl", ".hrl",
+	".clj", ".cljs", ".cljc",
+	".hs",
+	".ml", ".mli",
+	".el", ".elisp",
+	".lisp", ".cl",
+	".tcl",
+	".raku",
+	".sol",
+]);
+
+function isCodeFile(filePath: string | null | undefined): boolean {
+	if (!filePath) return false;
+	const lastDot = filePath.lastIndexOf(".");
+	if (lastDot === -1) return true; // no extension → treat as code (e.g. Makefile)
+	const ext = filePath.slice(lastDot).toLowerCase();
+	return CODE_FILE_EXTENSIONS.has(ext);
+}
+
 function isUnboundedReadInput(input: Record<string, unknown>): boolean {
 	const hasOffset = typeof input.offset === "number";
 	const hasLimit = typeof input.limit === "number";
@@ -115,6 +161,7 @@ function getNonSymbolicIncrement(toolName: string, input: Record<string, unknown
 	}
 
 	if (toolName === "read") {
+		if (!isCodeFile(getFilePathFromToolInput(input))) return 0;
 		return isUnboundedReadInput(input) ? NON_SYMBOLIC_UNBOUNDED_READ_INCREMENT : 1;
 	}
 
@@ -329,6 +376,7 @@ export default function jetbrainsIndexExtension(pi: ExtensionAPI): void {
 
 		if (
 			effectiveToolName === "read"
+			&& isCodeFile(getFilePathFromToolInput(input))
 			&& isUnboundedReadInput(input)
 			&& consecutiveLargeReadCountThisTurn >= LARGE_READ_CONSECUTIVE_BLOCK_THRESHOLD
 		) {
@@ -414,6 +462,9 @@ export default function jetbrainsIndexExtension(pi: ExtensionAPI): void {
 		const input = (event.input ?? {}) as Record<string, unknown>;
 
 		if (event.toolName === "read" && !event.isError) {
+			const filePath = getFilePathFromToolInput(input);
+			if (!isCodeFile(filePath)) return;
+
 			const unbounded = isUnboundedReadInput(input);
 			const lineCount = countTextLinesFromToolContent(event.content);
 			const isLargeRead = lineCount > LARGE_READ_LINE_THRESHOLD;

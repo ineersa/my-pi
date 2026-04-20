@@ -8,6 +8,8 @@ import { randomBytes } from "node:crypto";
 // ─── config ─────────────────────────────────────────────────────────────
 
 const MAX_CHARS = 20_000; // ~5000 tokens
+const MAX_CHARS_DOCS = 50_000; // ~12500 tokens — higher limit for docs/non-code files
+const DOC_FILE_EXTENSIONS = new Set([".toon", ".md"]);
 const MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
 
 // ─── temp file helpers ──────────────────────────────────────────────────
@@ -93,6 +95,19 @@ function estimateTokens(charCount: number): number {
 	return Math.ceil(charCount / 4);
 }
 
+function isDocFile(input: Record<string, unknown> | undefined): boolean {
+	const candidates = [input?.path, input?.file_path, input?.filePath, input?.file];
+	for (const value of candidates) {
+		if (typeof value === "string" && value.trim().length > 0) {
+			const lastDot = value.lastIndexOf(".");
+			if (lastDot !== -1 && DOC_FILE_EXTENSIONS.has(value.slice(lastDot).toLowerCase())) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 // ─── extension ──────────────────────────────────────────────────────────
 
 export default function outputCapExtension(pi: ExtensionAPI): void {
@@ -111,6 +126,12 @@ export default function outputCapExtension(pi: ExtensionAPI): void {
 
 		if (text.length <= MAX_CHARS) return;
 
+		// Check if this is a doc/non-code file with a higher limit
+		const toolInput = (event.input ?? {}) as Record<string, unknown>;
+		if (isDocFile(toolInput) && text.length <= MAX_CHARS_DOCS) return;
+
+		const effectiveMax = isDocFile(toolInput) ? MAX_CHARS_DOCS : MAX_CHARS;
+
 		// Determine where the full output lives:
 		// 1. Pi may have already saved full output to a temp file (details.fullOutputPath)
 		// 2. Otherwise, we save it ourselves
@@ -128,11 +149,11 @@ export default function outputCapExtension(pi: ExtensionAPI): void {
 		}
 
 		const estTokens = estimateTokens(text.length);
-		const capTokens = estimateTokens(MAX_CHARS);
+		const capTokens = estimateTokens(effectiveMax);
 
 		const notice =
 			`⛔ Output capped: ${text.length.toLocaleString()} chars (~${estTokens.toLocaleString()} tokens) ` +
-			`exceeds ${MAX_CHARS.toLocaleString()} char limit (~${capTokens.toLocaleString()} tokens).\n` +
+			`exceeds ${effectiveMax.toLocaleString()} char limit (~${capTokens.toLocaleString()} tokens).\n` +
 			`Full output saved to: ${savedPath}\n` +
 			`Use \`head -50 ${savedPath}\` or \`grep <pattern> ${savedPath}\` to inspect.`;
 
