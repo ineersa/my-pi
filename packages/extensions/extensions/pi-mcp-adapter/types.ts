@@ -73,6 +73,7 @@ export interface McpSettings {
   idleTimeout?: number;
   directTools?: boolean;
   disableProxyTool?: boolean;
+  toonEncode?: boolean | string[];
 }
 
 export interface McpConfig {

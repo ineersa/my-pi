@@ -6,6 +6,7 @@ import { lazyConnect, getFailureAgeSeconds } from "./init.js";
 import { isServerCacheValid } from "./metadata-cache.js";
 import { formatSchema } from "./tool-metadata.js";
 import { transformMcpContent } from "./tool-registrar.js";
+import { maybeEncodeToon } from "./toon-encoder.js";
 import { formatToolName, isToolExcluded } from "./types.js";
 import { resourceNameToToolName } from "./resource-tools.js";
 
@@ -269,10 +270,11 @@ export function createDirectToolExecutor(
 
       if (spec.resourceUri) {
         const result = await connection.client.readResource({ uri: spec.resourceUri });
-        const content = (result.contents ?? []).map(c => ({
+        const rawContent = (result.contents ?? []).map(c => ({
           type: "text" as const,
           text: "text" in c ? c.text : ("blob" in c ? `[Binary data: ${(c as { mimeType?: string }).mimeType ?? "unknown"}]` : JSON.stringify(c)),
         }));
+        const content = maybeEncodeToon(rawContent, spec.serverName, state.config);
         return {
           content: content.length > 0 ? content : [{ type: "text" as const, text: "(empty resource)" }],
           details: { server: spec.serverName, resourceUri: spec.resourceUri },
@@ -289,10 +291,10 @@ export function createDirectToolExecutor(
       });
 
       const mcpContent = (result.content ?? []) as McpContent[];
-      const content = transformMcpContent(mcpContent);
+      const rawContent = transformMcpContent(mcpContent);
 
       if (result.isError) {
-        let errorText = content
+        let errorText = rawContent
           .filter(c => c.type === "text")
           .map(c => (c as { text: string }).text)
           .join("\n") || "Tool execution failed";
@@ -305,6 +307,7 @@ export function createDirectToolExecutor(
         };
       }
 
+      const content = maybeEncodeToon(rawContent, spec.serverName, state.config);
       return {
         content: content.length > 0 ? content : [{ type: "text" as const, text: "(empty result)" }],
         details: { server: spec.serverName, tool: spec.originalName },

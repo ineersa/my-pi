@@ -5,6 +5,7 @@ import { getServerPrefix } from "./types.js";
 import { lazyConnect, updateServerMetadata, updateMetadataCache, getFailureAgeSeconds, updateStatusBar } from "./init.js";
 import { buildToolMetadata, getToolNames, findToolByName, formatSchema } from "./tool-metadata.js";
 import { transformMcpContent } from "./tool-registrar.js";
+import { maybeEncodeToon } from "./toon-encoder.js";
 import { truncateAtWord } from "./utils.js";
 
 type ProxyToolResult = AgentToolResult<Record<string, unknown>>;
@@ -497,10 +498,11 @@ export async function executeCall(
 
     if (toolMeta.resourceUri) {
       const result = await connection.client.readResource({ uri: toolMeta.resourceUri });
-      const content = (result.contents ?? []).map(c => ({
+      const rawContent = (result.contents ?? []).map(c => ({
         type: "text" as const,
         text: "text" in c ? c.text : ("blob" in c ? `[Binary data: ${(c as { mimeType?: string }).mimeType ?? "unknown"}]` : JSON.stringify(c)),
       }));
+      const content = maybeEncodeToon(rawContent, serverName, state.config);
       return {
         content: content.length > 0 ? content : [{ type: "text" as const, text: "(empty resource)" }],
         details: { mode: "call", resourceUri: toolMeta.resourceUri, server: serverName },
@@ -513,10 +515,10 @@ export async function executeCall(
     });
 
     const mcpContent = (result.content ?? []) as McpContent[];
-    const content = transformMcpContent(mcpContent);
+    const rawContent = transformMcpContent(mcpContent);
 
     if (result.isError) {
-      const errorText = content
+      const errorText = rawContent
         .filter((c) => c.type === "text")
         .map((c) => (c as { text: string }).text)
         .join("\n") || "Tool execution failed";
@@ -532,6 +534,7 @@ export async function executeCall(
       };
     }
 
+    const content = maybeEncodeToon(rawContent, serverName, state.config);
     return {
       content: content.length > 0 ? content : [{ type: "text" as const, text: "(empty result)" }],
       details: { mode: "call", mcpResult: result, server: serverName, tool: toolMeta.originalName },
