@@ -20,13 +20,19 @@ Behavior is controlled by built-in constants in:
 
 Key built-in limits/intervals:
 
-- Index readiness retries before edit/write: `3`
-- Retry delay: `5s`
+- Index readiness retries before edit/write: `5`
+- Index readiness retry backoff: exponential from `2s`, capped at `30s`
 - Large read threshold: `>200` lines
-- Large unbounded read block threshold: `4` consecutive reads
-- Mixed non-symbolic block threshold: weighted streak `>=6`
+- Large unbounded read block threshold: `4` consecutive large unbounded reads
+- Mixed non-symbolic block threshold: weighted streak `>=6` (driven by **large** unbounded reads)
 - Nudge cooldown: `5 minutes`
 - Non-symbolic deny cooldown: `120 seconds`
+
+Read-streak behavior:
+
+- Unbounded reads below the large-read threshold do not contribute to the non-symbolic deny streak.
+- Semantic IDE tool calls reset read/non-symbolic streak pressure.
+- Regex-style shell search (`rg`/`grep` via `bash`/`grep`) also resets streak pressure.
 
 ## Tool expectations
 

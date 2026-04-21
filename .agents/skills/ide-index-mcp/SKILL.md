@@ -2,132 +2,96 @@
 name: ide-index-mcp
 description: >
   Guide for using JetBrains IDE Index MCP tools for code navigation, refactoring, and analysis.
-  TRIGGER: When ANY of these MCP tools are available in the current session: ide_find_references,
-  ide_find_definition, ide_find_class, ide_find_file, ide_search_text, ide_diagnostics,
-  ide_index_status, ide_sync_files, ide_refactor_rename, ide_move_file, ide_type_hierarchy,
-  ide_call_hierarchy, ide_find_implementations, ide_find_symbol, ide_find_super_methods,
-  ide_file_structure, ide_refactor_safe_delete, ide_reformat_code, ide_build_project,
-  ide_read_file, ide_get_active_file, ide_open_file.
-  Use when performing code navigation (find usages, go to definition, find class),
-  code analysis (diagnostics, type hierarchy, call hierarchy),
-  refactoring (rename, move, safe delete, reformat),
-  or searching code (text search, symbol search, file search).
-  Prefer IDE tools over grep/find/sed for ALL semantic code operations.
+  TRIGGER: When ANY JetBrains index tool is available in-session (prefer current names:
+  jetbrains_index_ide_find_references, jetbrains_index_ide_find_definition,
+  jetbrains_index_ide_find_class, jetbrains_index_ide_find_file,
+  jetbrains_index_ide_search_text, jetbrains_index_ide_diagnostics,
+  jetbrains_index_ide_index_status, jetbrains_index_ide_sync_files,
+  jetbrains_index_ide_refactor_rename, jetbrains_index_ide_move_file,
+  jetbrains_index_ide_type_hierarchy, jetbrains_index_ide_call_hierarchy,
+  jetbrains_index_ide_find_implementations, jetbrains_index_ide_find_super_methods).
+  Use when performing semantic navigation, diagnostics, refactoring, hierarchy/call-flow,
+  or indexed search. Prefer IDE tools over grep/find/sed for semantic code operations.
 ---
 
 # IDE Index MCP - Agent Guide
 
-The IDE Index MCP server exposes JetBrains IDE indexing and refactoring capabilities. These tools provide **semantic** code understanding superior to text-based search/replace.
-
 ## Core Rule
 
-**Always prefer IDE MCP tools over built-in tools (grep, find, sed, read) for semantic code operations.** IDE tools understand code structure, types, inheritance, and references. Built-in tools only see text.
+**Prefer JetBrains IDE index tools for semantic operations.**
+Use built-in grep/find/bash only when IDE tools do not support the need (mainly regex search).
 
-## When to Use IDE Tools vs Built-In Tools
+## Canonical Tool Map (current server)
 
-| Task | Use IDE Tool | Use Built-In Tool |
-|------|-------------|-------------------|
-| Find all usages of a method/class/variable | `ide_find_references` | Never - grep misses renamed imports, aliases, overrides |
-| Go to a symbol's definition | `ide_find_definition` | Never - grep can't resolve through imports/generics |
-| Find a class by name | `ide_find_class` | Only if IDE unavailable |
-| Find a file by name | `ide_find_file` | `Glob` is fine for simple patterns |
-| Search for a word in code | `ide_search_text` | `Grep` is fine for regex patterns (IDE tool is exact-word only) |
-| Rename a symbol across project | `ide_refactor_rename` | Never - sed/replace breaks code |
-| Move a file to another directory | `ide_move_file` | Never - mv/git mv breaks imports |
-| Check for errors in a file | `ide_diagnostics` | Never - no equivalent |
-| Understand class hierarchy | `ide_type_hierarchy` | Never - no equivalent |
-| Find who calls a method | `ide_call_hierarchy` | Never - grep misses indirect calls |
-| Find interface implementations | `ide_find_implementations` | Never - grep can't resolve type relationships |
-| Delete a symbol safely | `ide_refactor_safe_delete` | Never - manual deletion misses usages |
-| Find what a method overrides | `ide_find_super_methods` | Never - no equivalent |
-| Read file content | Built-in Read tool | `ide_read_file` only for library/jar sources |
-| Find text with regex | `Grep` | IDE search_text doesn't support regex |
+| Task | Primary tool |
+| --- | --- |
+| Find usages/references | `jetbrains_index_ide_find_references` |
+| Go to definition | `jetbrains_index_ide_find_definition` |
+| Find class/interface | `jetbrains_index_ide_find_class` |
+| Find file | `jetbrains_index_ide_find_file` |
+| Exact indexed word search | `jetbrains_index_ide_search_text` |
+| Rename symbol/file safely | `jetbrains_index_ide_refactor_rename` |
+| Move file with refs/imports updates | `jetbrains_index_ide_move_file` |
+| Diagnostics (file/build/tests) | `jetbrains_index_ide_diagnostics` |
+| Type hierarchy | `jetbrains_index_ide_type_hierarchy` |
+| Callers/callees tree | `jetbrains_index_ide_call_hierarchy` |
+| Interface/abstract implementations | `jetbrains_index_ide_find_implementations` |
+| Parent overridden/implemented methods | `jetbrains_index_ide_find_super_methods` |
+| IDE readiness | `jetbrains_index_ide_index_status` |
+| Sync PSI/VFS after external edits | `jetbrains_index_ide_sync_files` |
 
-## Pre-Flight Check
+## High-Value Updates to Remember
 
-Before using any IDE tool that requires smart mode, check IDE readiness:
+- `jetbrains_index_ide_call_hierarchy` is now practical for day-to-day tracing:
+  - use `direction: "callers"` for impact analysis,
+  - use `direction: "callees"` for execution flow,
+  - tune `depth` and apply any new project-scope/dependency-filter params exposed by `mcp describe`.
+- Many search/navigation tools are paginated (`nextCursor`/`cursor`).
+  Continue with cursor instead of falling back to broad scans.
+- Updated server builds may exclude dependency/vendor sources (e.g., `node_modules`) by default; if not, use available scope/filter params.
+- For position-based targets, use `file + line + column`.
+  `language + symbol` remains language-handler dependent.
 
-```
-ide_index_status -> if isDumbMode: true, wait a few seconds and retry
-```
+## Pre-Flight
 
-Most tools require smart mode (IDE finished indexing). Tools that work in dumb mode: `ide_index_status`, `ide_sync_files`, `ide_reformat_code`, `ide_open_file`, `ide_get_active_file`.
-
-## File Sync Rule
-
-If you created or modified files outside the IDE (via Write/Edit tools) and an IDE search tool returns incomplete/missing results, call `ide_sync_files` first, then retry.
-
-```json
-{ "paths": ["src/new_file.java", "src/modified_file.java"] }
-```
-
-Omit `paths` to sync the entire project.
+1. If results look wrong or empty, call `jetbrains_index_ide_index_status`.
+2. If files changed via `edit`/`write`, call `jetbrains_index_ide_sync_files` for changed paths.
+3. Retry semantic query after sync/index readiness.
+4. If behavior changed after MCP update, run `mcp describe` for the exact tool before using older examples.
 
 ## Parameter Rules
 
-1. **Line and column are 1-based** (first line = 1, first column = 1)
-2. **File paths are relative** to project root (e.g., `src/main/java/App.java`, NOT absolute paths)
-3. **Column must point to the symbol name**, not whitespace or punctuation. For `public void myMethod()`, column should land on `m` of `myMethod`
-4. **project_path is only needed** for multi-project workspaces. Omit for single-project setups. When needed, use the absolute path to the project root.
+1. Paths are project-relative.
+2. `line`/`column` are 1-based.
+3. Put `column` on the symbol token, not punctuation/whitespace.
+4. Use `project_path` only when required (multi-project).
+5. Respect pagination (`nextCursor` -> `cursor`) on large result sets.
 
-## Tool Selection by Task
+## When Built-in Tools Are Acceptable
 
-### "I need to understand how X is used"
-1. `ide_find_references` - all call sites, field accesses, imports
-2. `ide_call_hierarchy` with `direction: "callers"` - full call chain upward
+- Regex-only search patterns (`rg`/`grep`) not supported by `jetbrains_index_ide_search_text`.
+- Non-semantic filesystem operations where IDE tools are irrelevant.
 
-### "I need to understand what X is"
-1. `ide_find_definition` - jump to source
-2. `ide_type_hierarchy` - inheritance chain
-3. `ide_find_super_methods` - what interface/base method it implements
+## Mistakes to Avoid
 
-### "I need to find a class/file/symbol"
-1. `ide_find_class` - classes by name (CamelCase: `USvc` finds `UserService`)
-2. `ide_find_file` - files by name
-3. `ide_search_text` - exact word occurrences across project
+1. Grep for usages/definitions instead of semantic IDE tools.
+2. Text replace for rename instead of `jetbrains_index_ide_refactor_rename`.
+3. `mv/git mv` for source moves instead of `jetbrains_index_ide_move_file`.
+4. Forgetting sync after external edits.
+5. Ignoring pagination and then assuming “no more results”.
 
-### "I need to refactor"
-1. `ide_refactor_rename` - rename symbol + all references atomically
-2. `ide_move_file` - move file + update all imports/references
-3. `ide_refactor_safe_delete` - delete with usage checking (Java/Kotlin only)
-4. `ide_reformat_code` - apply project code style (disabled by default)
+## Quick Workflow Patterns
 
-### "I need to check for problems"
-1. `ide_diagnostics` - compiler errors, warnings, quick fixes
+### Understand how something is used
+1. `jetbrains_index_ide_find_references`
+2. `jetbrains_index_ide_call_hierarchy` (`direction: "callers"`)
 
-### "I need to find implementations of an interface"
-1. `ide_find_implementations` - cursor on interface/abstract class/method
+### Understand what something is
+1. `jetbrains_index_ide_find_definition`
+2. `jetbrains_index_ide_type_hierarchy`
+3. `jetbrains_index_ide_find_super_methods`
 
-### "I need to trace call chains"
-1. `ide_call_hierarchy` with `direction: "callers"` - who calls this?
-2. `ide_call_hierarchy` with `direction: "callees"` - what does this call?
-
-## Common Mistakes to Avoid
-
-1. **Using grep instead of `ide_find_references`**: Grep finds text, not semantic usages. Misses aliased imports, includes false positives from comments/strings.
-
-2. **Using sed/replace instead of `ide_refactor_rename`**: Text replacement breaks code. IDE rename updates all references, getters/setters, overrides, test classes, imports.
-
-3. **Using mv/git mv instead of `ide_move_file`**: File system moves don't update imports, package declarations, or references. IDE move handles all of this automatically.
-
-4. **Forgetting to check index status**: If IDE is indexing (dumb mode), most tools error. Check `ide_index_status` first if a tool fails unexpectedly.
-
-5. **Using 0-based line/column**: All IDE tools use **1-based**. Line 5 in file = `line: 5`.
-
-6. **Passing absolute file paths**: Use relative paths. `src/main/App.java`, not `/Users/me/project/src/main/App.java`.
-
-6. **Not syncing after external file changes**: After creating files via Write tool, call `ide_sync_files` before searching.
-
-7. **Using `ide_search_text` for regex**: This tool is exact-word only (uses word index). Use `Grep` for regex.
-
-8. **Using `ide_find_class` for methods/functions**: It searches classes only. Use `ide_search_text` for a quick word lookup.
-
-## Disabled-by-Default Tools
-
-These tools exist but are disabled by default. If you get "tool not found", they need to be enabled in IDE settings (Settings > Tools > Index MCP Server):
-
-`ide_build_project`, `ide_file_structure`, `ide_find_symbol`, `ide_read_file`, `ide_get_active_file`, `ide_open_file`, `ide_reformat_code`
-
-## Detailed Tool Parameters
-
-For complete parameter reference with types, defaults, and return formats, see [tools-reference.md](references/tools-reference.md).
+### Refactor safely
+1. `jetbrains_index_ide_refactor_rename`
+2. `jetbrains_index_ide_move_file`
+3. `jetbrains_index_ide_diagnostics` (validate post-change)

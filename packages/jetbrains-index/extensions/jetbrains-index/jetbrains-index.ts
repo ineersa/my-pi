@@ -124,14 +124,6 @@ function resolveEffectiveToolName(toolName: string, input: Record<string, unknow
 	return toolName;
 }
 
-function isSearchFirstResetTool(toolName: string): boolean {
-	return toolName.endsWith("ide_find_file")
-		|| toolName.endsWith("ide_search_text")
-		|| toolName.endsWith("ide_find_class")
-		|| toolName.endsWith("ide_find_definition")
-		|| toolName.endsWith("ide_find_references");
-}
-
 function isSemanticIdeTool(toolName: string): boolean {
 	return toolName.endsWith("ide_find_file")
 		|| toolName.endsWith("ide_search_text")
@@ -155,39 +147,17 @@ function getBashCommand(input: Record<string, unknown>): string {
 	return command.trim();
 }
 
-function getNonSymbolicIncrement(toolName: string, input: Record<string, unknown>): number {
+function isShellSearchResetTool(toolName: string, input: Record<string, unknown>): boolean {
 	if (toolName === "grep") {
-		return 1;
-	}
-
-	if (toolName === "read") {
-		if (!isCodeFile(getFilePathFromToolInput(input))) return 0;
-		return isUnboundedReadInput(input) ? NON_SYMBOLIC_UNBOUNDED_READ_INCREMENT : 1;
+		return true;
 	}
 
 	if (toolName === "bash") {
 		const command = getBashCommand(input);
-		if (command && SEARCH_BASH_REGEX.test(command)) {
-			return 1;
-		}
+		return command.length > 0 && SEARCH_BASH_REGEX.test(command);
 	}
 
-	return 0;
-}
-
-function describeNonSymbolicTool(toolName: string, input: Record<string, unknown>): string {
-	if (toolName === "read") {
-		return isUnboundedReadInput(input) ? "read (unbounded)" : "read";
-	}
-
-	if (toolName === "bash") {
-		const command = getBashCommand(input);
-		if (command && SEARCH_BASH_REGEX.test(command)) {
-			return `bash (${toCommandPreview(command)})`;
-		}
-	}
-
-	return toolName;
+	return false;
 }
 
 function isMoveCommand(command: string): boolean {
@@ -369,9 +339,14 @@ export default function jetbrainsIndexExtension(pi: ExtensionAPI): void {
 		const input = (event.input ?? {}) as Record<string, unknown>;
 		const effectiveToolName = resolveEffectiveToolName(event.toolName, input);
 
-		if (isSearchFirstResetTool(effectiveToolName)) {
+		const isSemanticReset = isSemanticIdeTool(effectiveToolName);
+		const isShellSearchReset = isShellSearchResetTool(effectiveToolName, input);
+		if (isSemanticReset || isShellSearchReset) {
 			consecutiveLargeReadCountThisTurn = 0;
 			nearReadBlockWarningSentThisTurn = false;
+			nonSymbolicStreakCountThisTurn = 0;
+			unboundedReadCountThisTurn = 0;
+			unboundedReadWarningSentThisTurn = false;
 		}
 
 		if (
@@ -392,28 +367,29 @@ export default function jetbrainsIndexExtension(pi: ExtensionAPI): void {
 			};
 		}
 
-		if (isSemanticIdeTool(effectiveToolName)) {
-			nonSymbolicStreakCountThisTurn = 0;
-		} else {
-			const increment = getNonSymbolicIncrement(effectiveToolName, input);
-			if (increment > 0) {
+		if (!isSemanticReset && !isShellSearchReset) {
+			const isUnboundedCodeRead =
+				effectiveToolName === "read"
+				&& isCodeFile(getFilePathFromToolInput(input))
+				&& isUnboundedReadInput(input);
+			if (isUnboundedCodeRead) {
 				const now = Date.now();
 				const cooldownElapsed =
 					lastNonSymbolicDenyAt === 0 || now - lastNonSymbolicDenyAt >= NON_SYMBOLIC_DENY_COOLDOWN_MS;
-				if (cooldownElapsed) {
-					nonSymbolicStreakCountThisTurn += increment;
-					if (nonSymbolicStreakCountThisTurn >= NON_SYMBOLIC_STREAK_BLOCK_THRESHOLD) {
-						const reason = `Blocked ${describeNonSymbolicTool(effectiveToolName, input)} after ${nonSymbolicStreakCountThisTurn} consecutive non-symbolic steps. Prefer JetBrains IDE index tools first (find_definition/find_references/find_file/search_text). Cooldown: ${Math.round(NON_SYMBOLIC_DENY_COOLDOWN_MS / 1000)}s.`;
-						nonSymbolicStreakCountThisTurn = 0;
-						lastNonSymbolicDenyAt = now;
-						if (ctx.hasUI) {
-							ctx.ui.notify(`⛔ ${reason}`, "warning");
-						}
-						return {
-							block: true,
-							reason,
-						};
+				if (
+					cooldownElapsed
+					&& nonSymbolicStreakCountThisTurn >= NON_SYMBOLIC_STREAK_BLOCK_THRESHOLD
+				) {
+					const reason = `Blocked read (unbounded) after ${nonSymbolicStreakCountThisTurn} consecutive non-symbolic large-read steps. Prefer JetBrains IDE index tools first (find_definition/find_references/find_file/search_text). Cooldown: ${Math.round(NON_SYMBOLIC_DENY_COOLDOWN_MS / 1000)}s.`;
+					nonSymbolicStreakCountThisTurn = 0;
+					lastNonSymbolicDenyAt = now;
+					if (ctx.hasUI) {
+						ctx.ui.notify(`⛔ ${reason}`, "warning");
 					}
+					return {
+						block: true,
+						reason,
+					};
 				}
 			}
 		}
@@ -472,27 +448,26 @@ export default function jetbrainsIndexExtension(pi: ExtensionAPI): void {
 			if (!unbounded) {
 				consecutiveLargeReadCountThisTurn = 0;
 				nearReadBlockWarningSentThisTurn = false;
+				nonSymbolicStreakCountThisTurn = 0;
 			} else if (isLargeRead) {
 				consecutiveLargeReadCountThisTurn += 1;
+				nonSymbolicStreakCountThisTurn += NON_SYMBOLIC_UNBOUNDED_READ_INCREMENT;
 			} else {
 				consecutiveLargeReadCountThisTurn = 0;
 				nearReadBlockWarningSentThisTurn = false;
+				nonSymbolicStreakCountThisTurn = 0;
 			}
 
-			if (unbounded) {
+			if (unbounded && isLargeRead) {
 				unboundedReadCountThisTurn += 1;
-				const reasons: string[] = [];
-
-				if (isLargeRead) {
-					reasons.push(
-						`Large unbounded read detected (${lineCount} lines). Use search-first and bounded reads to minimize tokens.`,
-					);
-				}
+				const reasons: string[] = [
+					`Large unbounded read detected (${lineCount} lines). Use search-first and bounded reads to minimize tokens.`,
+				];
 
 				if (unboundedReadCountThisTurn >= 2 && !unboundedReadWarningSentThisTurn) {
 					unboundedReadWarningSentThisTurn = true;
 					reasons.push(
-						`You already made ${unboundedReadCountThisTurn} unbounded reads this turn. Prefer bounded read windows (offset/limit).`,
+						`You already made ${unboundedReadCountThisTurn} large unbounded reads this turn. Prefer bounded read windows (offset/limit).`,
 					);
 				}
 

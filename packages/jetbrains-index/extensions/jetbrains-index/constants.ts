@@ -58,7 +58,7 @@ export const NON_SYMBOLIC_STREAK_BLOCK_THRESHOLD = 6;
 /** Minimum cooldown between mixed non-symbolic deny actions. */
 export const NON_SYMBOLIC_DENY_COOLDOWN_MS = 120 * 1000;
 
-/** Unbounded reads count heavier in mixed non-symbolic streak tracking. */
+/** Large unbounded reads count heavier in mixed non-symbolic streak tracking. */
 export const NON_SYMBOLIC_UNBOUNDED_READ_INCREMENT = 2;
 
 export const PROXY_DISCOVERY_WORKFLOW = [
@@ -66,11 +66,11 @@ export const PROXY_DISCOVERY_WORKFLOW = [
 	"Important: mcp(...) is a TOOL call, not a shell command. Never run it via bash.",
 	"",
 	"Discovery workflow (tool calls):",
-	"1) Call mcp with connect=\"jetbrains\"",
-	"2) Call mcp with server=\"jetbrains\"",
+	"1) Call mcp with connect=\"jetbrains-index\"",
+	"2) Call mcp with server=\"jetbrains-index\"",
 	"3) Call mcp with describe=\"jetbrains_<tool>\" to load exact parameter schema",
 	"4) Call mcp with tool=\"jetbrains_<tool>\" and args as object (or legacy JSON string)",
 ].join("\n");
 
 export const PROXY_RECONNECT_NOTIFY =
-	"JetBrains MCP proxy mode: consider /mcp reconnect jetbrains once after startup to refresh tool metadata.";
+	"JetBrains MCP proxy mode: consider /mcp reconnect jetbrains-index once after startup to refresh tool metadata.";

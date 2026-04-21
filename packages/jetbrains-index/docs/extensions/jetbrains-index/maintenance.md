@@ -30,8 +30,12 @@ When updating behavior, keep these invariants intact:
    - mutation should be blocked.
 4. Introduce a new code issue via edit:
    - post-edit reminder should include new diagnostics summary.
-5. Trigger repeated unbounded reads:
+5. Trigger repeated **large** unbounded reads (>200 lines):
    - reminders should appear; hard block should trigger at threshold.
+6. Interleave with semantic IDE calls (or regex shell search via `rg`/`grep`):
+   - read/non-symbolic streak counters should reset and avoid stale carry-over blocking.
+7. Trigger unbounded reads under the large-read threshold:
+   - these should not contribute to the mixed non-symbolic deny streak.
 
 ## Release notes guidance
 

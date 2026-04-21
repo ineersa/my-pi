@@ -127,10 +127,13 @@ When working with this codebase:
   - Renaming symbols: use `jetbrains_index_ide_refactor_rename` instead of edit/sed replacements
   - Moving code files: use `jetbrains_index_ide_move_file` instead of `mv`/`git mv`
   - Hierarchy/call flow: use `jetbrains_index_ide_type_hierarchy`, `jetbrains_index_ide_call_hierarchy`, `jetbrains_index_ide_find_implementations`, `jetbrains_index_ide_find_super_methods`
+    - For call hierarchy, set `direction` (`callers`/`callees`), tune `depth`, and use any project-scope/dependency-filter params exposed by the current tool schema
   - Diagnostics/index/sync: use `jetbrains_index_ide_diagnostics`, `jetbrains_index_ide_index_status`, `jetbrains_index_ide_sync_files`
 - If IDE tools fail unexpectedly or results seem incomplete, check `jetbrains_index_ide_index_status`
 - After creating/modifying files with `edit`/`write`, run `jetbrains_index_ide_sync_files` on changed paths before retrying IDE queries
 - Use project-relative file paths and 1-based `line`/`column` for IDE tool calls
+- Prefer pagination via `cursor`/`nextCursor` for `find_file`, `find_class`, `search_text`, `find_references`, and `find_implementations` instead of broad fallback scans
+- When JetBrains MCP gets updated, trust live `mcp describe` schemas over cached assumptions in prompts/skills
 - Before changing extension/tool/theme behavior, read the package docs index at `packages/<pkg>/docs/ai-index.json`, then open only the referenced `settings.md` + `maintenance.md` for the target entity
 - These tools are faster, more context-efficient, and better integrated with the IDE than the default tools
 - Only fall back to default tools when IDE tools do not support the needed operation (e.g., regex search)
