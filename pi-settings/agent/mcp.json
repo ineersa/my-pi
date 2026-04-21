@@ -9,10 +9,12 @@
       "url": "https://mcp.context7.com/mcp",
       "headers": {
         "CONTEXT7_API_KEY": "${CONTEXT7_API_KEY}"
-      }
+      },
+      "directTools": true
     },
     "websearch": {
-      "url": "http://192.168.2.38:9001/sse"
+      "url": "http://192.168.2.38:9001/sse",
+      "directTools": true
     }
   }
 }

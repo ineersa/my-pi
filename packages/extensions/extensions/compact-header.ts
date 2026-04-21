@@ -15,8 +15,7 @@ import { getAgentDir } from "@mariozechner/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
 import { getSafeModeState, subscribeSafeMode } from "./runtime-mode";
 import { getMcpServerStatus } from "./mcp-shared-state.js";
-import { discoverAgents } from "./subagents-lite/agent-registry.js";
-import { listRuns } from "./subagents-lite/history/status-store.js";
+import { discoverAvailableAgentNames } from "./lib/agent-discovery.js";
 
 /** Read `plainIcons` from settings.json (global or project-local). */
 function loadPlainIconsSetting(): boolean {
@@ -36,10 +35,7 @@ function loadPlainIconsSetting(): boolean {
 
 interface SubagentsHeaderSnapshot {
 	availableAgents: number;
-	runningRuns: number;
-	runningAgents: number;
 	availableAgentNames: string[];
-	runningAgentNames: string[];
 }
 
 const SUBAGENTS_SNAPSHOT_TTL_MS = 2000;
@@ -76,41 +72,16 @@ function getSubagentsHeaderSnapshot(cwd: string): SubagentsHeaderSnapshot {
 	let availableAgentNames: string[] = [];
 	let availableAgents = 0;
 	try {
-		availableAgentNames = discoverAgents(cwd)
-			.map((agent) => agent.name)
-			.sort((a, b) => a.localeCompare(b));
+		availableAgentNames = discoverAvailableAgentNames(cwd).sort((a, b) => a.localeCompare(b));
 		availableAgents = availableAgentNames.length;
 	} catch {
 		availableAgentNames = [];
 		availableAgents = 0;
 	}
 
-	let runningRuns = 0;
-	let runningAgents = 0;
-	let runningAgentNames: string[] = [];
-	try {
-		const runs = listRuns(30);
-		for (const run of runs) {
-			if (run.state !== "running") continue;
-			runningRuns += 1;
-			for (const step of run.steps) {
-				if (step.status !== "running") continue;
-				runningAgents += 1;
-				runningAgentNames.push(step.agent);
-			}
-		}
-	} catch {
-		runningRuns = 0;
-		runningAgents = 0;
-		runningAgentNames = [];
-	}
-
 	const snapshot = {
 		availableAgents,
-		runningRuns,
-		runningAgents,
 		availableAgentNames,
-		runningAgentNames,
 	};
 	subagentsSnapshotCache = { cwd, ts: now, snapshot };
 	return snapshot;
@@ -179,19 +150,16 @@ export default function (pi: ExtensionAPI) {
 					const subagents = getSubagentsHeaderSnapshot(ctx.cwd);
 					lines.push(
 						t(
-							`${pad(d("agents"), lk)}${a(`${subagents.runningAgents} running (${subagents.runningRuns} runs) / ${subagents.availableAgents} available`)} ${d("•")} ${a("manage via tmux panes")}`,
+							`${pad(d("agents"), lk)}${a(`${subagents.availableAgents} available`)} ${d("•")} ${a("/agents or /subagents-status")}`,
 						),
 					);
-					lines.push(
-						t(
-							`${pad(d("running"), lk)}${a(formatAgentNameSummary(subagents.runningAgentNames))}`,
-						),
-					);
-					lines.push(
-						t(
-							`${pad(d("available"), lk)}${a(formatAgentNameSummary(subagents.availableAgentNames))}`,
-						),
-					);
+					if (subagents.availableAgentNames.length > 0) {
+						lines.push(
+							t(
+								`${pad(d("available"), lk)}${a(formatAgentNameSummary(subagents.availableAgentNames))}`,
+							),
+						);
+					}
 
 					// Add MCP server status — read live so it reflects current state
 					const mcpServers = getMcpServerStatus();

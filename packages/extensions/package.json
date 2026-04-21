@@ -1,6 +1,6 @@
 {
   "name": "@ineersa/my-pi-extensions",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Personal extension bundle for pi-coding-agent",
   "keywords": [
     "pi-package"
@@ -17,7 +17,6 @@
       "./extensions/session-status.ts",
       "./extensions/usage.ts",
       "./extensions/pi-mcp-adapter/pi-mcp-adapter.ts",
-      "./extensions/subagents-lite/subagents-lite.ts",
       "./extensions/intercom/intercom.ts",
       "./extensions/custom-compaction/custom-compaction.ts",
       "./extensions/output-cap/output-cap.ts"

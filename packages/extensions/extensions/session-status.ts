@@ -12,7 +12,7 @@ const EXTENSIONS_ENTITY_NAMES = [
 	"session-status",
 	"usage",
 	"pi-mcp-adapter",
-	"subagents-lite",
+	"subagents",
 	"intercom",
 	"custom-compaction",
 	"output-cap",

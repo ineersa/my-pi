@@ -104,17 +104,6 @@
       }
     },
     {
-      "id": "subagents-lite",
-      "kind": "extension",
-      "name": "subagents-lite",
-      "entry": "./extensions/subagents-lite/subagents-lite.ts",
-      "docs": {
-        "settings": "docs/extensions/subagents-lite/settings.md",
-        "usage": "docs/extensions/subagents-lite/usage.md",
-        "maintenance": "docs/extensions/subagents-lite/maintenance.md"
-      }
-    },
-    {
       "id": "intercom",
       "kind": "extension",
       "name": "intercom",
