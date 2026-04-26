@@ -11,6 +11,7 @@ Primary flags:
 - `--local` (project scope, `.pi/settings.json`)
 - `--remove` (remove installed specs)
 - `--yes` (non-interactive defaults)
+- `--no-scheduler` (keep scheduler disabled: skip install and remove existing scheduler spec in same scope/source)
 
 ## Files the installer writes
 

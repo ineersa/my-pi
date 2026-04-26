@@ -68,12 +68,18 @@ export interface ServerEntry {
   debug?: boolean;
 }
 
+export interface McpCaptureStatsSettings {
+  path?: string;
+  flushDelayMs?: number;
+}
+
 export interface McpSettings {
   toolPrefix?: "server" | "none" | "short";
   idleTimeout?: number;
   directTools?: boolean;
   disableProxyTool?: boolean;
   toonEncode?: boolean | string[];
+  captureStats?: boolean | McpCaptureStatsSettings;
 }
 
 export interface McpConfig {

@@ -2,7 +2,7 @@
 
 Personal extension bundle + installer for [pi-coding-agent](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent).
 
-One command to install safe-guard, scheduler, themes, and more:
+One command to install safe-guard, scheduler (optional), themes, and more:
 
 ```bash
 npx @ineersa/my-pi
@@ -15,7 +15,7 @@ Running `npx @ineersa/my-pi` registers the following packages globally in `~/.pi
 | Package | What it adds |
 |---------|-------------|
 | `@ineersa/my-pi-extensions` | safe-guard, bg-process, compact-header, custom-footer, skill-palette, rewind, session-status, usage, pi-mcp-adapter, subagents-lite |
-| `@ineersa/my-pi-scheduler` | Recurring checks, one-time reminders, `schedule_prompt` tool |
+| `@ineersa/my-pi-scheduler` | Recurring checks, one-time reminders, `schedule_prompt` tool (optional; prompted separately with default **No**) |
 | `@ineersa/my-pi-jetbrains-index` | Standalone JetBrains index diagnostics gate (IDE-first guardrails + diagnostics sync) |
 | `@ineersa/my-pi-themes` | Theme pack: catppuccin-mocha, cyberpunk, gruvbox-dark, nord, oh-p-dark, tokyo-night |
 
@@ -29,6 +29,8 @@ It also:
 
 ```bash
 npx @ineersa/my-pi
+# skip scheduler package
+npx @ineersa/my-pi --no-scheduler
 ```
 
 Extensions, theme, and safe-guard policy are available in **every** pi session.

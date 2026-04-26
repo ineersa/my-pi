@@ -87,7 +87,6 @@ jetbrains-index.ts     ← entry point, hooks pi events
 ├── mcp-problems-client.ts ← MCP transport (connect/retry/reconnect)
 ├── capabilities.ts     ← detect available IDE tools
 ├── constants.ts        ← thresholds, cooldowns, regexes
-├── read-scope.ts       ← read-type detection helpers
 ├── tool-names.ts       ← tool name resolution (direct + proxy)
 └── types.ts            ← shared type definitions
 ```

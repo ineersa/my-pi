@@ -126,48 +126,79 @@ export default function (pi: ExtensionAPI) {
 					const a = (s: string) => theme.fg("accent", s);
 
 					const cmds = pi.getCommands();
-					const prompts = cmds
-						.filter((c) => c.source === "prompt")
-						.map((c) => `/${c.name}`)
-						.join("  ");
-					const skills = cmds
-						.filter((c) => c.source === "skill")
-						.map((c) => c.name)
-						.join("  ");
+					const hasPrompts = cmds.some((c) => c.source === "prompt");
+					const hasSkills = cmds.some((c) => c.source === "skill");
 
-					const t = (s: string) => truncateToWidth(s, width);
-					const pad = (s: string, w: number) => s + " ".repeat(Math.max(0, w - visibleWidth(s)));
-					const lk = 9; // label width
+					const lk = 9; // label column width
 					const lines: string[] = [];
 
-					if (prompts) {
-						lines.push(t(`${pad(d("prompts"), lk)}${a(prompts)}`));
+					// Wrap a label + items across multiple lines if needed.
+					// First line: "label   item1  item2", continuation: "         item3  item4"
+					// Each item is individually styled so colors survive line breaks.
+					function wrapLabel(label: string, items: string[]): void {
+						const labelPad = label + " ".repeat(Math.max(0, lk - visibleWidth(label)));
+						const indent = " ".repeat(lk);
+
+						let first = true;
+						let currentLine = "";
+						let currentWidth = 0;
+						const prefixWidth = first ? visibleWidth(labelPad) : lk;
+
+						for (const item of items) {
+							const itemWidth = visibleWidth(item);
+							const gapWidth = currentLine ? 2 : 0;
+							const totalWidth = prefixWidth + currentWidth + gapWidth + itemWidth;
+
+							if (totalWidth <= width) {
+								currentLine += (currentLine ? "  " : "") + item;
+								currentWidth += gapWidth + itemWidth;
+							} else {
+								if (currentLine) {
+									lines.push(truncateToWidth((first ? labelPad : indent) + currentLine, width));
+									first = false;
+								}
+								currentLine = item;
+								currentWidth = itemWidth;
+							}
+						}
+						if (currentLine) {
+							lines.push(truncateToWidth((first ? labelPad : indent) + currentLine, width));
+						}
 					}
-					if (skills) {
-						lines.push(t(`${pad(d("skills"), lk)}${a(skills)}`));
+
+					if (hasPrompts) {
+						const promptItems = cmds
+							.filter((c) => c.source === "prompt")
+							.map((c) => a(`/${c.name}`));
+						wrapLabel(d("prompts"), promptItems);
+					}
+					if (hasSkills) {
+						const skillItems = cmds
+							.filter((c) => c.source === "skill")
+							.map((c) => a(c.name));
+						wrapLabel(d("skills"), skillItems);
 					}
 
 					const subagents = getSubagentsHeaderSnapshot(ctx.cwd);
 					lines.push(
-						t(
-							`${pad(d("agents"), lk)}${a(`${subagents.availableAgents} available`)} ${d("•")} ${a("/agents or /subagents-status")}`,
+						truncateToWidth(
+							`${d("agents") + " ".repeat(Math.max(0, lk - 4))}${a(`${subagents.availableAgents} available`)} ${d("•")} ${a("/agents or /subagents-status")}`,
+							width,
 						),
 					);
 					if (subagents.availableAgentNames.length > 0) {
-						lines.push(
-							t(
-								`${pad(d("available"), lk)}${a(formatAgentNameSummary(subagents.availableAgentNames))}`,
-							),
-						);
+						const agentItems = formatAgentNameSummary(subagents.availableAgentNames)
+							.split(", ")
+							.map((s) => a(s));
+						wrapLabel(d("available"), agentItems);
 					}
 
 					// Add MCP server status — read live so it reflects current state
 					const mcpServers = getMcpServerStatus();
 					if (mcpServers.length > 0) {
-						const mcpStatus = mcpServers
-							.map((s) => `${s.icon} ${s.name}${s.tools !== undefined ? ` (${s.tools})` : ""}: ${s.status}`)
-							.join("  ");
-						lines.push(t(`${pad(d("mcp"), lk)}${a(mcpStatus)}`));
+						const mcpItems = mcpServers
+							.map((s) => a(`${s.icon} ${s.name}${s.tools !== undefined ? ` (${s.tools})` : ""}: ${s.status}`));
+						wrapLabel(d("mcp"), mcpItems);
 					}
 
 					lines.push(d("─".repeat(width)));

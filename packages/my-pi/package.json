@@ -1,6 +1,6 @@
 {
   "name": "@ineersa/my-pi",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "One-command installer for my pi extension bundle",
   "keywords": [
     "pi-package",

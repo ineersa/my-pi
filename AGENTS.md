@@ -33,6 +33,7 @@ Package responsibilities:
   - `safe-guard`: policy-driven command/file safety gate (`allow/ask/block`).
   - `bg-process`: long-running bash backgrounding + per-session process cleanup.
   - `compact-header`: compact header with MCP/subagent-aware runtime indicators.
+  - `focus-cursor`: switches editor rendering to hardware cursor mode for focus-aware terminal cursor states.
   - `custom-footer`: rich footer (model/usage/git/PR probe) with throttled probes.
   - `skill-palette`: discovers skills/themes and renders skill-context UI.
   - `rewind`: git-based checkpoint snapshots + deterministic restore flows.
@@ -56,6 +57,7 @@ Package responsibilities:
 | safe-guard | [settings](packages/extensions/docs/extensions/safe-guard/settings.md) · [maintenance](packages/extensions/docs/extensions/safe-guard/maintenance.md) |
 | bg-process | [settings](packages/extensions/docs/extensions/bg-process/settings.md) · [maintenance](packages/extensions/docs/extensions/bg-process/maintenance.md) |
 | compact-header | [settings](packages/extensions/docs/extensions/compact-header/settings.md) · [maintenance](packages/extensions/docs/extensions/compact-header/maintenance.md) |
+| focus-cursor | [settings](packages/extensions/docs/extensions/focus-cursor/settings.md) · [maintenance](packages/extensions/docs/extensions/focus-cursor/maintenance.md) |
 | custom-footer | [settings](packages/extensions/docs/extensions/custom-footer/settings.md) · [maintenance](packages/extensions/docs/extensions/custom-footer/maintenance.md) |
 | skill-palette | [settings](packages/extensions/docs/extensions/skill-palette/settings.md) · [maintenance](packages/extensions/docs/extensions/skill-palette/maintenance.md) |
 | rewind | [settings](packages/extensions/docs/extensions/rewind/settings.md) · [maintenance](packages/extensions/docs/extensions/rewind/maintenance.md) |

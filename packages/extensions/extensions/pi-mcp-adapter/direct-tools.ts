@@ -8,6 +8,7 @@ import { formatSchema } from "./tool-metadata.js";
 import { transformMcpContent } from "./tool-registrar.js";
 import { maybeEncodeToon } from "./toon-encoder.js";
 import { formatToolName, isToolExcluded } from "./types.js";
+import type { ToolCallEvent } from "./stats.js";
 import { resourceNameToToolName } from "./resource-tools.js";
 
 const BUILTIN_NAMES = new Set(["read", "bash", "edit", "write", "grep", "find", "ls", "mcp"]);
@@ -220,6 +221,16 @@ export function createDirectToolExecutor(
   return async function execute(_toolCallId, params) {
     let state = getState();
     const initPromise = getInitPromise();
+    const record = (outcome: "success" | "error", errorCode?: string): void => {
+      const event: ToolCallEvent = {
+        serverName: spec.serverName,
+        toolName: spec.originalName,
+        mode: "direct",
+        outcome,
+        errorCode,
+      };
+      state?.statsTracker?.record(event);
+    };
 
     if (!state && initPromise) {
       try {
@@ -244,12 +255,14 @@ export function createDirectToolExecutor(
       const authConnection = state.manager.getConnection(spec.serverName);
       if (authConnection?.status === "needs-auth") {
         const message = `MCP server "${spec.serverName}" requires auth and is not supported in this build.`;
+        record("error", "auth_required");
         return {
           content: [{ type: "text" as const, text: message }],
           details: { error: "auth_required", server: spec.serverName, message },
         };
       }
       const failedAgo = getFailureAgeSeconds(state, spec.serverName);
+      record("error", "server_unavailable");
       return {
         content: [{ type: "text" as const, text: `MCP server "${spec.serverName}" not available${failedAgo !== null ? ` (failed ${failedAgo}s ago)` : ""}` }],
         details: { error: "server_unavailable", server: spec.serverName },
@@ -258,6 +271,7 @@ export function createDirectToolExecutor(
 
     const connection = state.manager.getConnection(spec.serverName);
     if (!connection || connection.status !== "connected") {
+      record("error", "not_connected");
       return {
         content: [{ type: "text" as const, text: `MCP server "${spec.serverName}" not connected` }],
         details: { error: "not_connected", server: spec.serverName },
@@ -275,6 +289,7 @@ export function createDirectToolExecutor(
           text: "text" in c ? c.text : ("blob" in c ? `[Binary data: ${(c as { mimeType?: string }).mimeType ?? "unknown"}]` : JSON.stringify(c)),
         }));
         const content = maybeEncodeToon(rawContent, spec.serverName, state.config);
+        record("success");
         return {
           content: content.length > 0 ? content : [{ type: "text" as const, text: "(empty resource)" }],
           details: { server: spec.serverName, resourceUri: spec.resourceUri },
@@ -301,6 +316,7 @@ export function createDirectToolExecutor(
         if (spec.inputSchema) {
           errorText += `\n\nExpected parameters:\n${formatSchema(spec.inputSchema)}`;
         }
+        record("error", "tool_error");
         return {
           content: [{ type: "text" as const, text: `Error: ${errorText}` }],
           details: { error: "tool_error", server: spec.serverName },
@@ -308,6 +324,7 @@ export function createDirectToolExecutor(
       }
 
       const content = maybeEncodeToon(rawContent, spec.serverName, state.config);
+      record("success");
       return {
         content: content.length > 0 ? content : [{ type: "text" as const, text: "(empty result)" }],
         details: { server: spec.serverName, tool: spec.originalName },
@@ -318,6 +335,7 @@ export function createDirectToolExecutor(
       if (spec.inputSchema) {
         errorText += `\n\nExpected parameters:\n${formatSchema(spec.inputSchema)}`;
       }
+      record("error", "call_failed");
       return {
         content: [{ type: "text" as const, text: errorText }],
         details: { error: "call_failed", server: spec.serverName },

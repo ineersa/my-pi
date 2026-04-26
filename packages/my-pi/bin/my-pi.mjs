@@ -77,7 +77,15 @@ async function promptChoice(rl, question, options, defaultIndex = 0) {
 
 function parseArgs(argv) {
 	const args = argv.slice(2);
-	const result = { version: null, local: false, remove: false, help: false, source: "npm", yes: false };
+	const result = {
+		version: null,
+		local: false,
+		remove: false,
+		help: false,
+		source: "npm",
+		yes: false,
+		scheduler: null, // null = use installer default (opt-in via prompt), false = disabled
+	};
 
 	for (let i = 0; i < args.length; i += 1) {
 		const arg = args[i];
@@ -94,6 +102,7 @@ function parseArgs(argv) {
 		if (arg === "--local" || arg === "-l") { result.local = true; continue; }
 		if (arg === "--remove" || arg === "-r") { result.remove = true; continue; }
 		if (arg === "--yes" || arg === "-y") { result.yes = true; continue; }
+		if (arg === "--no-scheduler") { result.scheduler = false; continue; }
 		if (arg === "--source") {
 			const next = args[++i];
 			if (next !== "npm" && next !== "local") {
@@ -119,12 +128,13 @@ my-pi — install your pi package set
 
 Usage:
   npx @ineersa/my-pi                     Install from npm (interactive)
-  npx @ineersa/my-pi --yes               Install everything with defaults
+  npx @ineersa/my-pi --yes               Install with defaults (scheduler stays disabled)
                                           (and apply bundled pi-settings if present)
   npx @ineersa/my-pi --local             Install project-local (.pi/settings.json)
   npx @ineersa/my-pi --remove            Remove all listed packages
   npx @ineersa/my-pi --version 0.1.0     Pin npm package versions
   npx @ineersa/my-pi --source local      Install from local workspace paths
+  npx @ineersa/my-pi --no-scheduler      Explicitly disable scheduler install
 
 Options:
   -v, --version <ver>   Pin package version (npm source only)
@@ -132,6 +142,7 @@ Options:
   -r, --remove          Remove package specs from pi settings
   -y, --yes             Accept all defaults (non-interactive)
       --source <mode>   npm | local (default: npm)
+      --no-scheduler    Keep scheduler disabled (skip install + remove if present)
   -h, --help            Show this help
 
 Packages:
@@ -625,11 +636,16 @@ async function main() {
 	let installPackages = true;
 	let installAgentsAndSkills = !opts.local;
 	let installGlobalPiSettings = false;
+	let installScheduler = opts.scheduler ?? false;
+	const schedulerPackage = INSTALLER_PACKAGES.find((pkg) => pkg.npmName === "@ineersa/my-pi-scheduler");
 
 	if (!opts.local && !nonInteractive) {
 		const hasBundledPiSettings = Boolean(findBundledPiSettingsDir());
 		const rl = createInterface({ input: process.stdin, output: process.stdout });
 		installPackages = await promptYesNo(rl, "Install extensions/packages?", true);
+		if (installPackages && opts.scheduler === null && schedulerPackage) {
+			installScheduler = await promptYesNo(rl, "Install scheduler package separately?", false);
+		}
 		installAgentsAndSkills = await promptYesNo(rl, "Install agents + skills?", true);
 		if (hasBundledPiSettings) {
 			installGlobalPiSettings = await promptYesNo(
@@ -643,6 +659,12 @@ async function main() {
 		rl.close();
 	} else if (!opts.local && nonInteractive) {
 		installGlobalPiSettings = Boolean(findBundledPiSettingsDir());
+	}
+
+	if (opts.local && !nonInteractive && opts.scheduler === null && schedulerPackage) {
+		const rl = createInterface({ input: process.stdin, output: process.stdout });
+		installScheduler = await promptYesNo(rl, "Install scheduler package separately?", false);
+		rl.close();
 	}
 
 	let failures = 0;
@@ -675,10 +697,24 @@ async function main() {
 	// ── 3. Install packages (appends to the now-restored settings.json) ──────────
 
 	if (installPackages) {
-		for (const pkg of INSTALLER_PACKAGES) {
+		const packagesToInstall = (installScheduler || !schedulerPackage)
+			? INSTALLER_PACKAGES
+			: INSTALLER_PACKAGES.filter((pkg) => pkg !== schedulerPackage);
+
+		if (!installScheduler && schedulerPackage) {
+			console.log("  Scheduler package disabled for this run.");
+		}
+
+		for (const pkg of packagesToInstall) {
 			const spec = toInstallSource(pkg, opts);
 			const ok = run(pi, "install", [spec, ...localFlag], { label: pkg.name });
 			if (!ok) failures += 1;
+		}
+
+		if (!installScheduler && schedulerPackage) {
+			const removeSpec = toRemoveSource(schedulerPackage, opts);
+			const removed = run(pi, "remove", [removeSpec, ...localFlag], { label: `${schedulerPackage.name} (disabled)` });
+			if (!removed) failures += 1;
 		}
 
 		if (failures > 0) {

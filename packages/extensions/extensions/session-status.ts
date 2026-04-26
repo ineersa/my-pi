@@ -6,6 +6,7 @@ const EXTENSIONS_ENTITY_NAMES = [
 	"safe-guard",
 	"bg-process",
 	"compact-header",
+	"focus-cursor",
 	"custom-footer",
 	"skill-palette",
 	"rewind",
@@ -16,6 +17,7 @@ const EXTENSIONS_ENTITY_NAMES = [
 	"intercom",
 	"custom-compaction",
 	"output-cap",
+	"ide",
 ];
 
 export default function sessionStatusExtension(pi: ExtensionAPI): void {

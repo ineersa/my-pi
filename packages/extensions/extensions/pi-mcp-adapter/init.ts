@@ -20,6 +20,7 @@ import { buildToolMetadata, totalToolCount } from "./tool-metadata.js";
 import { parallelLimit } from "./utils.js";
 import { logger } from "./logger.js";
 import { getMissingConfiguredDirectToolServers } from "./direct-tools.js";
+import { createStatsTracker } from "./stats.js";
 
 const FAILURE_BACKOFF_MS = 60 * 1000;
 
@@ -34,6 +35,7 @@ export async function initializeMcp(
   const lifecycle = new McpLifecycleManager(manager);
   const toolMetadata = new Map<string, ToolMetadata[]>();
   const failureTracker = new Map<string, number>();
+  const statsTracker = createStatsTracker(config, ctx.cwd);
   const ui = ctx.hasUI ? ctx.ui : undefined;
   const state: McpExtensionState = {
     manager,
@@ -41,6 +43,7 @@ export async function initializeMcp(
     toolMetadata,
     config,
     failureTracker,
+    statsTracker,
     ui,
   };
 

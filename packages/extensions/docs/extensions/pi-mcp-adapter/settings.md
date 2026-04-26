@@ -5,7 +5,48 @@ Config file: `~/.pi/agent/mcp.json` (or `.pi/mcp.json` for project-local config)
 Key sections:
 
 - `mcpServers.<name>` (command/url, auth, lifecycle, direct tools, etc.)
-- `settings` (`toolPrefix`, `idleTimeout`, `directTools`, `disableProxyTool`, `toonEncode`)
+- `settings` (`toolPrefix`, `idleTimeout`, `directTools`, `disableProxyTool`, `toonEncode`, `captureStats`)
+
+## `settings.captureStats`
+
+Optional. Captures per-server/per-tool MCP call statistics to a project-local JSON file.
+
+- `true` — enable stats with defaults
+- `false` / omitted — disabled (default)
+- object — configure file path and flush delay:
+  - `path` (string): output file path (relative paths are resolved from project root)
+  - `flushDelayMs` (number): debounce window for writes (default `750`)
+
+Default output path: `.pi/mcp-tool-stats.json`
+
+Captured counters include:
+
+- server totals: `calls`, `success`, `errors`, `proxyCalls`, `directCalls`
+- per-tool totals: same counters plus `errorCodes` buckets
+- timestamps: `lastCalledAt`, `lastSuccessAt`, `lastErrorAt`
+
+Example:
+
+```json
+{
+  "settings": {
+    "captureStats": true
+  }
+}
+```
+
+Custom path example:
+
+```json
+{
+  "settings": {
+    "captureStats": {
+      "path": ".pi/mcp-stats/jetbrains.json",
+      "flushDelayMs": 500
+    }
+  }
+}
+```
 
 ## `settings.toonEncode`
 

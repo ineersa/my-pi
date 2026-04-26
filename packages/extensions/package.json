@@ -1,6 +1,6 @@
 {
   "name": "@ineersa/my-pi-extensions",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Personal extension bundle for pi-coding-agent",
   "keywords": [
     "pi-package"
@@ -11,6 +11,7 @@
       "./extensions/safe-guard/safe-guard.ts",
       "./extensions/bg-process.ts",
       "./extensions/compact-header.ts",
+      "./extensions/focus-cursor.ts",
       "./extensions/custom-footer.ts",
       "./extensions/skill-palette/skill-palette.ts",
       "./extensions/rewind/rewind.ts",
@@ -19,7 +20,8 @@
       "./extensions/pi-mcp-adapter/pi-mcp-adapter.ts",
       "./extensions/intercom/intercom.ts",
       "./extensions/custom-compaction/custom-compaction.ts",
-      "./extensions/output-cap/output-cap.ts"
+      "./extensions/output-cap/output-cap.ts",
+      "./extensions/ide/ide.ts"
     ]
   },
   "files": [

@@ -15,6 +15,7 @@ Local dev: `pi install ./packages/extensions -l`
 - **[safe-guard](extensions/safe-guard/README.md)** — permission gate: blocks sudo, asks on destructive commands, writes outside CWD, and sensitive file reads. Persistent allowlists via UI.
 - **bg-process** — overrides `bash`; after 15s it asks whether to move long-running commands to background, tracks them via `bg_status`, and sends completion notifications.
 - **compact-header** — dense startup header with model/provider/thinking + keybinding cheatsheet.
+- **focus-cursor** — replaces editor software cursor with terminal hardware cursor so focus/unfocused cursor states work in split panes.
 - **custom-footer** — rich footer with tokens/cost/context/cwd/branch (+ PR probe), plus `/status` overlay.
 - **[skill-palette](extensions/skill-palette/README.md)** — `/skill` command palette to queue a skill for the next prompt with fuzzy search + status widget.
 - **[rewind](extensions/rewind/README.md)** — automatic git worktree snapshots at every prompt boundary with exact file restoration during `/fork` and `/tree` navigation.

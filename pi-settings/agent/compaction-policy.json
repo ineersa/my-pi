@@ -3,8 +3,8 @@
   "trigger": {
     "autoMaxTokens": {
       "contextWindowThreshold": 200000,
-      "above": 140000,
-      "below": 120000
+      "above": 150000,
+      "below": 130000
     }
   },
   "ui": { "name": "ctx", "showStatus": true, "minimalStatus": true },

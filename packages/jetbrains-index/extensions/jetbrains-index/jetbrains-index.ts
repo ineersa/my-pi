@@ -1,4 +1,4 @@
-import { resolve } from "node:path";
+import { isAbsolute, relative, resolve } from "node:path";
 import { statSync } from "node:fs";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { formatDiagnosticsSummary } from "./diagnostics.js";
@@ -72,6 +72,16 @@ const CODE_FILE_EXTENSIONS = new Set([
 	".raku",
 	".sol",
 ]);
+
+function isPathInsideCwd(filePath: string | null | undefined, cwd: string): boolean {
+	if (!filePath) return false;
+	const trimmed = filePath.trim();
+	if (trimmed.length === 0) return false;
+	const resolvedCwd = resolve(cwd);
+	const resolvedTarget = isAbsolute(trimmed) ? resolve(trimmed) : resolve(resolvedCwd, trimmed);
+	const rel = relative(resolvedCwd, resolvedTarget);
+	return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+}
 
 function isCodeFile(filePath: string | null | undefined): boolean {
 	if (!filePath) return false;
@@ -352,6 +362,7 @@ export default function jetbrainsIndexExtension(pi: ExtensionAPI): void {
 		if (
 			effectiveToolName === "read"
 			&& isCodeFile(getFilePathFromToolInput(input))
+			&& isPathInsideCwd(getFilePathFromToolInput(input), ctx.cwd)
 			&& isUnboundedReadInput(input)
 			&& consecutiveLargeReadCountThisTurn >= LARGE_READ_CONSECUTIVE_BLOCK_THRESHOLD
 		) {
@@ -371,6 +382,7 @@ export default function jetbrainsIndexExtension(pi: ExtensionAPI): void {
 			const isUnboundedCodeRead =
 				effectiveToolName === "read"
 				&& isCodeFile(getFilePathFromToolInput(input))
+				&& isPathInsideCwd(getFilePathFromToolInput(input), ctx.cwd)
 				&& isUnboundedReadInput(input);
 			if (isUnboundedCodeRead) {
 				const now = Date.now();
@@ -439,7 +451,7 @@ export default function jetbrainsIndexExtension(pi: ExtensionAPI): void {
 
 		if (event.toolName === "read" && !event.isError) {
 			const filePath = getFilePathFromToolInput(input);
-			if (!isCodeFile(filePath)) return;
+			if (!isCodeFile(filePath) || !isPathInsideCwd(filePath, ctx.cwd)) return;
 
 			const unbounded = isUnboundedReadInput(input);
 			const lineCount = countTextLinesFromToolContent(event.content);

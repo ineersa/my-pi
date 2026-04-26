@@ -9,7 +9,10 @@ Key modules:
 - `direct-tools.ts` direct registration/execution
 - `metadata-cache.ts` cache load/flush
 - `toon-encoder.ts` optional TOON encoding of JSON responses (`maybeEncodeToon`)
+- `stats.ts` optional capture of per-server/per-tool call outcomes (`McpStatsTracker`)
 
 On session restart, prior MCP state is shut down before re-init.
 
 TOON encoding is applied in both `proxy-modes.ts` (`executeCall`) and `direct-tools.ts` (`createDirectToolExecutor`) after `transformMcpContent`, only for successful non-error results when `settings.toonEncode` covers the server. Dependency: `@toon-format/toon`.
+
+When `settings.captureStats` is enabled, both proxy and direct tool executions append call counters (success/error and error-code buckets) to a debounced project-local stats file (default `.pi/mcp-tool-stats.json`). Stats flush on shutdown via `pi-mcp-adapter.ts`.

@@ -4,7 +4,7 @@ import { Type } from "@sinclair/typebox";
 import { showStatus, showTools, reconnectServers } from "./commands.js";
 import { loadMcpConfig } from "./config.js";
 import { buildProxyDescription, createDirectToolExecutor, getMissingConfiguredDirectToolServers, resolveDirectTools } from "./direct-tools.js";
-import { flushMetadataCache, initializeMcp, updateStatusBar } from "./init.js";
+import { flushMetadataCache, initializeMcp } from "./init.js";
 import { loadMetadataCache } from "./metadata-cache.js";
 import { executeCall, executeConnect, executeDescribe, executeList, executeSearch, executeStatus } from "./proxy-modes.js";
 import { getConfigPathFromArgv, truncateAtWord } from "./utils.js";
@@ -24,6 +24,16 @@ export default function mcpAdapter(pi: ExtensionAPI) {
       flushMetadataCache(currentState);
     } catch (error) {
       flushError = error;
+    }
+
+    try {
+      currentState.statsTracker?.dispose();
+    } catch (error) {
+      if (!flushError) {
+        flushError = error;
+      } else {
+        console.error("MCP: stats flush failed after metadata flush error", error);
+      }
     }
 
     try {

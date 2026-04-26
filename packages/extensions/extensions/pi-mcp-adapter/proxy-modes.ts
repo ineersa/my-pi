@@ -7,6 +7,7 @@ import { buildToolMetadata, getToolNames, findToolByName, formatSchema } from ".
 import { transformMcpContent } from "./tool-registrar.js";
 import { maybeEncodeToon } from "./toon-encoder.js";
 import { truncateAtWord } from "./utils.js";
+import type { ToolCallEvent } from "./stats.js";
 
 type ProxyToolResult = AgentToolResult<Record<string, unknown>>;
 
@@ -354,8 +355,27 @@ export async function executeCall(
   let serverName: string | undefined = serverOverride;
   let toolMeta: ToolMetadata | undefined;
   const prefixMode = state.config.settings?.toolPrefix ?? "server";
+  const record = (
+    outcome: "success" | "error",
+    errorCode?: string,
+    override?: { serverName?: string; toolName?: string },
+  ): void => {
+    const targetServer = override?.serverName ?? serverName;
+    if (!targetServer) return;
+
+    const event: ToolCallEvent = {
+      serverName: targetServer,
+      toolName: override?.toolName ?? toolMeta?.originalName ?? toolName,
+      mode: "proxy",
+      outcome,
+      errorCode,
+    };
+
+    state.statsTracker?.record(event);
+  };
 
   if (serverName && !state.config.mcpServers[serverName]) {
+    record("error", "server_not_found", { serverName, toolName });
     return {
       content: [{ type: "text" as const, text: `Server "${serverName}" not found. Use mcp({}) to see available servers.` }],
       details: { mode: "call", error: "server_not_found", server: serverName },
@@ -365,6 +385,7 @@ export async function executeCall(
   if (serverName) {
     const serverDef = state.config.mcpServers[serverName];
     if (serverDef?.enabled === false) {
+      record("error", "disabled", { serverName, toolName });
       return {
         content: [{ type: "text" as const, text: `Server "${serverName}" is disabled in config.` }],
         details: { mode: "call", error: "disabled", server: serverName },
@@ -423,6 +444,11 @@ export async function executeCall(
     } else {
       msg += " Use mcp({ search: \"...\" }) to search.";
     }
+
+    if (hintServer) {
+      record("error", "tool_not_found", { serverName: hintServer, toolName });
+    }
+
     return {
       content: [{ type: "text" as const, text: msg }],
       details: { mode: "call", error: "tool_not_found", requestedTool: toolName, hintServer },
@@ -432,6 +458,7 @@ export async function executeCall(
   let connection = state.manager.getConnection(serverName);
   if (connection?.status === "needs-auth") {
     const message = getAuthRequiredMessage(serverName);
+    record("error", "auth_required");
     return {
       content: [{ type: "text" as const, text: message }],
       details: { mode: "call", error: "auth_required", server: serverName, message },
@@ -440,6 +467,7 @@ export async function executeCall(
   if (!connection || connection.status !== "connected") {
     const failedAgo = getFailureAgeSeconds(state, serverName);
     if (failedAgo !== null) {
+      record("error", "server_backoff");
       return {
         content: [{ type: "text" as const, text: `Server "${serverName}" not available (last failed ${failedAgo}s ago)` }],
         details: { mode: "call", error: "server_backoff", server: serverName },
@@ -448,6 +476,7 @@ export async function executeCall(
 
     const definition = state.config.mcpServers[serverName];
     if (!definition || definition.enabled === false) {
+      record("error", "server_not_connected");
       return {
         content: [{ type: "text" as const, text: `Server "${serverName}" not connected` }],
         details: { mode: "call", error: "server_not_connected", server: serverName },
@@ -461,6 +490,7 @@ export async function executeCall(
       connection = await state.manager.connect(serverName, definition);
       if (connection.status === "needs-auth") {
         const message = getAuthRequiredMessage(serverName);
+        record("error", "auth_required");
         return {
           content: [{ type: "text" as const, text: message }],
           details: { mode: "call", error: "auth_required", server: serverName, message },
@@ -476,6 +506,7 @@ export async function executeCall(
         const hint = available.length > 0
           ? `Available tools on "${serverName}": ${available.join(", ")}`
           : `Server "${serverName}" has no tools.`;
+        record("error", "tool_not_found_after_reconnect", { toolName });
         return {
           content: [{ type: "text" as const, text: `Tool "${toolName}" not found on "${serverName}" after reconnect. ${hint}` }],
           details: { mode: "call", error: "tool_not_found_after_reconnect", requestedTool: toolName },
@@ -485,6 +516,7 @@ export async function executeCall(
       state.failureTracker.set(serverName, Date.now());
       updateStatusBar(state);
       const message = error instanceof Error ? error.message : String(error);
+      record("error", "connect_failed");
       return {
         content: [{ type: "text" as const, text: `Failed to connect to "${serverName}": ${message}` }],
         details: { mode: "call", error: "connect_failed", message },
@@ -503,6 +535,7 @@ export async function executeCall(
         text: "text" in c ? c.text : ("blob" in c ? `[Binary data: ${(c as { mimeType?: string }).mimeType ?? "unknown"}]` : JSON.stringify(c)),
       }));
       const content = maybeEncodeToon(rawContent, serverName, state.config);
+      record("success");
       return {
         content: content.length > 0 ? content : [{ type: "text" as const, text: "(empty resource)" }],
         details: { mode: "call", resourceUri: toolMeta.resourceUri, server: serverName },
@@ -528,6 +561,7 @@ export async function executeCall(
         errorWithSchema += `\n\nExpected parameters:\n${formatSchema(toolMeta.inputSchema)}`;
       }
 
+      record("error", "tool_error");
       return {
         content: [{ type: "text" as const, text: errorWithSchema }],
         details: { mode: "call", error: "tool_error", mcpResult: result },
@@ -535,6 +569,7 @@ export async function executeCall(
     }
 
     const content = maybeEncodeToon(rawContent, serverName, state.config);
+    record("success");
     return {
       content: content.length > 0 ? content : [{ type: "text" as const, text: "(empty result)" }],
       details: { mode: "call", mcpResult: result, server: serverName, tool: toolMeta.originalName },
@@ -547,6 +582,7 @@ export async function executeCall(
       errorWithSchema += `\n\nExpected parameters:\n${formatSchema(toolMeta.inputSchema)}`;
     }
 
+    record("error", "call_failed");
     return {
       content: [{ type: "text" as const, text: errorWithSchema }],
       details: { mode: "call", error: "call_failed", message },

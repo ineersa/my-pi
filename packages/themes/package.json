@@ -1,6 +1,6 @@
 {
   "name": "@ineersa/my-pi-themes",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Color themes for pi: cyberpunk, nord, gruvbox, tokyo-night, catppuccin, and more.",
   "keywords": [
     "pi-package"
