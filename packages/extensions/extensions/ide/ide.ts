@@ -146,8 +146,8 @@ function findMatchingIde(): IdeFile | null {
         }
     }
 
-    // Priority 3: Most recent
-    return all.sort((a, b) => b.timestamp - a.timestamp)[0] || null;
+    // No PID or workspace match — don't claim a connection
+    return null;
 }
 
 // ─── Formatting ───────────────────────────────────────────────────────────
