@@ -23,12 +23,10 @@ LLMs can't use it because:
 │  3. Register a "ToolSearch" tool (always active)        │
 │  4. setActiveTools([ ...builtins, "ToolSearch" ])       │
 │     ↑ MCP tools are registered but NOT active           │
-│  5. Inject system reminder with deferred tool catalog   │
 │                                                         │
 │  LLM sees:                                              │
 │  - Built-in tools (read, bash, edit, ...)              │
-│  - ToolSearch tool                                      │
-│  - System reminder: "MCP tools: server_tool (desc)"     │
+│  - ToolSearch tool (catalog in description)             │
 │  - NO MCP tool schemas (saves ~2000+ tokens/turn)       │
 ├─────────────────────────────────────────────────────────┤
 │  TURN 1: LLM NEEDS AN MCP TOOL                         │
@@ -36,15 +34,15 @@ LLMs can't use it because:
 │  LLM: ToolSearch({ query: "jetbrains find definition" })│
 │                                                         │
 │  ToolSearch searches deferred pool, finds matches:      │
-│  - Returns: tool names + descriptions + FULL schemas    │
+│  - Returns: tool names + short descriptions (no schemas)│
 │  - Calls setActiveTools([...previous, "found_tool"])    │
-│  - Returns: "Loaded: server_tool. You can now call it." │
+│  - Returns: "Loaded: 3 tools. Call next turn."         │
 │                                                         │
 ├─────────────────────────────────────────────────────────┤
 │  TURN 2: TOOL IS NOW ACTIVE                             │
 │                                                         │
 │  LLM sees server_tool with full typed schema            │
-│  LLM calls: server_tool({ param: "value" })            │
+│  LLM calls: server__toolname({ param: "value" })         │
 │  execute() lazy-connects to server, calls the tool      │
 │  Result returned normally                               │
 │                                                         │
@@ -62,9 +60,10 @@ Replace the proxy tool. This is the only tool the LLM sees for MCP initially.
 // tool-search.ts
 
 export function createToolSearchTool(
-  state: McpExtensionState,
+  getState: () => McpExtensionState,
   pi: ExtensionAPI,
 ) {
+  const state = getState();
   return {
     name: "ToolSearch",
     label: "MCP ToolSearch",
@@ -76,35 +75,133 @@ export function createToolSearchTool(
       }),
     }),
     async execute(toolCallId: string, params: { query: string }) {
+      const currentState = getState();
       const { query } = params;
-      const deferredTools = getAllDeferredTools(state);
+      const deferredTools = getAllDeferredTools(currentState);
 
       // Parse select: prefix
       const selectMatch = query.match(/^select:(.+)$/i);
       if (selectMatch) {
         const names = selectMatch[1].split(",").map(s => s.trim());
-        return loadAndActivate(state, pi, names, deferredTools);
+        return loadAndActivate(pi, names, deferredTools);
       }
 
       // Keyword search
       const matches = searchByKeywords(query, deferredTools);
       if (matches.length === 0) {
         return {
-          content: [{ type: "text", text: `No MCP tools matching "${query}". Available servers: ${listServerNames(state)}` }],
+          content: [{ type: "text", text: `No MCP tools matching "${query}".` }],
         };
       }
 
-      return loadAndActivate(state, pi, matches.map(m => m.name), deferredTools);
+      return loadAndActivate(pi, matches.map(m => m.name), deferredTools);
     },
   };
 }
 ```
 
+**`searchByKeywords` — replicated from Claude Code's weighted scoring:**
+
+```typescript
+// Scoring weights per search term (claude-code values, adapted for server_toolname format)
+const SCORES = {
+  exactPartMatch: 10,        // term === part in tool name
+  subPartMatch: 5,           // part includes term (e.g., "def" in "definition")
+  fullNameContains: 3,        // fallback: full name contains term
+  descriptionMatch: 4,        // word-boundary match in description (acts as "hint")
+};
+const MAX_RESULTS = 5;
+
+interface DeferredTool {
+  name: string;              // server_toolname
+  originalName: string;       // original MCP tool name
+  description: string;
+  serverName: string;
+  inputSchema?: object;
+}
+
+function searchByKeywords(query: string, deferredTools: DeferredTool[]): DeferredTool[] {
+  const queryLower = query.toLowerCase().trim();
+
+  // Fast path: exact tool name match (case-insensitive)
+  const exactMatch = deferredTools.find(
+    t => t.name.toLowerCase() === queryLower || t.originalName.toLowerCase() === queryLower
+  );
+  if (exactMatch) return [exactMatch];
+
+  // Tokenize query into terms
+  const terms = queryLower.split(/\s+/).filter(t => t.length > 0);
+  if (terms.length === 0) return [];
+
+  // Compile word-boundary patterns for description matching
+  const termPatterns = new Map<string, RegExp>();
+  for (const term of terms) {
+    termPatterns.set(term, new RegExp(`\\b${escapeRegExp(term)}\\b`));
+  }
+
+  // Score each deferred tool
+  const scored: Array<{ tool: DeferredTool; score: number }> = [];
+  for (const tool of deferredTools) {
+    let score = 0;
+    const nameParts = parseToolNameParts(tool.name);
+    const descriptionLower = (tool.description || "").toLowerCase();
+
+    for (const term of terms) {
+      // Name match: exact part
+      if (nameParts.includes(term)) {
+        score += SCORES.exactPartMatch;
+        continue;
+      }
+      // Name match: sub-part
+      if (nameParts.some(p => p.includes(term))) {
+        score += SCORES.subPartMatch;
+        continue;
+      }
+      // Name match: full name contains (fallback)
+      if (tool.name.toLowerCase().includes(term)) {
+        score += SCORES.fullNameContains;
+        continue;
+      }
+      // Description word-boundary match
+      const pattern = termPatterns.get(term)!;
+      if (pattern.test(descriptionLower)) {
+        score += SCORES.descriptionMatch;
+      }
+    }
+
+    if (score > 0) scored.push({ tool, score });
+  }
+
+  // Sort descending by score, cap at MAX_RESULTS
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, MAX_RESULTS).map(s => s.tool);
+}
+
+/** Parse tool name into lowercase parts using __ as server/tool separator:
+ *  "jetbrains-index__ide_find_definition" → ["jetbrains", "index", "ide", "find", "definition"] */
+function parseToolNameParts(name: string): string[] {
+  const lower = name.toLowerCase();
+  // Split on __ to get [serverPrefix, toolName]
+  const parts = lower.split("__");
+  const toolPart = parts.length > 1 ? parts.slice(1).join("__") : parts[0];
+  return toolPart.split("_").filter(p => p.length > 0);
+}
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+```
+
+**Key design decisions vs Claude Code:**
+- Skipped `+required` prefix (simpler query model; LLMs handle this via tool description / system reminder)
+- Skipped `mcp__` prefix fast-path (our tool names use `server_toolname`, not `mcp__server__action`)
+- Skipped `searchHint` field (we use description as the primary text-match surface)
+- Skipped MCP +2 score bonus on part matches (simpler; no MCP-specific tool name handling needed)
+
 **Key behavior of `loadAndActivate`:**
 
 ```typescript
 function loadAndActivate(
-  state: McpExtensionState,
   pi: ExtensionAPI,
   toolNames: string[],
   deferredTools: DeferredTool[],
@@ -127,23 +224,23 @@ function loadAndActivate(
   }
 
   // Activate found tools
-  const currentActive = pi.getActiveTools();
+  // getActiveTools() returns objects; setActiveTools() expects string[]
+  const currentActive = pi.getActiveTools().map(t => t.name);
   const toActivate = found.map(t => t.name);
   const newActive = [...new Set([...currentActive, ...toActivate])];
   pi.setActiveTools(newActive);
 
-  // Build response with full schemas so LLM sees them in the tool result
-  let text = `Loaded ${found.length} MCP tool${found.length > 1 ? "s" : ""}:\n\n`;
+  // Build response: names + descriptions only (2-turn pattern).
+  // Schemas are NOT dumped — the LLM sees typed parameters next turn
+  // when they appear in the active tool list for the next API request.
+  let text = `Loaded ${found.length} MCP tool${found.length > 1 ? "s" : ""}. You can call them next turn with typed parameters:\n\n`;
   for (const tool of found) {
-    text += `## ${tool.name}\n${tool.description}\n`;
-    if (tool.inputSchema) {
-      text += `\nParameters:\n${formatSchema(tool.inputSchema, "  ")}\n`;
-    }
-    text += `\nYou can now call ${tool.name}(params) directly.\n\n`;
+    const shortDesc = (tool.description || "").split("\n")[0].slice(0, 120);
+    text += `- **${tool.name}**: ${shortDesc}\n`;
   }
 
   if (notFound.length > 0) {
-    text += `Not found: ${notFound.join(", ")}\n`;
+    text += `\nNot found: ${notFound.join(", ")}\n`;
   }
 
   return {
@@ -158,7 +255,14 @@ function loadAndActivate(
 ```typescript
 // In the main extension function, replace the proxy tool registration:
 
+// Step 0: Capture built-in active tools BEFORE any registerTool calls.
+// registerTool auto-adds to the active set, so we must snapshot first
+// to avoid re-adding deferred tools in the final setActiveTools call.
+const builtinActive = pi.getActiveTools();
+
 // Step 1: Register ALL MCP tools (from cache) with full schemas + execute
+// registerTool auto-activates each tool, so they temporarily enter the active set.
+// We narrow them back down in Step 3.
 // Partition into direct (always active) and deferred (need ToolSearch)
 const directToolNames: string[] = [];
 
@@ -180,21 +284,24 @@ for (const spec of allToolSpecs) {
 // Step 2: Register ToolSearch (always active)
 pi.registerTool(createToolSearchTool(stateGetter, pi));
 
-// Step 3: Set active tools = builtins + ToolSearch + direct tools
-// Deferred MCP tools are registered but NOT active
+// Step 3: Set active tools = builtins (captured before registration) + ToolSearch + direct tools
+// Deferred MCP tools were auto-activated by registerTool but are now excluded.
 pi.setActiveTools([
-  ...pi.getActiveTools(),  // builtins
+  ...builtinActive,  // captured BEFORE MCP tool registration, so only builtins
   "ToolSearch",
   ...directToolNames,
 ]);
 ```
 
-**`isDirectTool` logic** (reuses existing `resolveDirectTools` from `direct-tools.ts`):
+**`isDirectTool` logic:**
 - Per-server: `definition.directTools === true` → all tools from that server are direct
 - Per-server: `definition.directTools === ["tool1", "tool2"]` → only listed tools are direct
-- Global: `config.settings?.directTools === true` → all tools from all servers are direct
 - Env override: `MCP_DIRECT_TOOLS=server1,server2/toolname` → same as before
 - Anything not matching → deferred (needs ToolSearch)
+
+Removed settings (no longer applicable):
+- Global `directTools` — was `config.settings?.directTools`. Replaced by per-server config.
+- `disableProxyTool` — the `mcp` proxy tool is gone, nothing to disable.
 
 ### 3. REWRITE: ToolSearch description — the "catalog"
 
@@ -247,9 +354,8 @@ lifecycle.setReconnectCallback((serverName) => {
   updateServerMetadata(state, serverName);
   updateMetadataCache(state, serverName);
 
-  // Re-register ToolSearch with updated catalog
+  // Re-register ToolSearch with updated catalog (registerTool auto-calls refreshTools)
   pi.registerTool(createToolSearchTool(() => state, pi));
-  pi.refreshTools(); // picks up the new description
 
   // Re-activate: ToolSearch + previously discovered tools + new tools
   const discovered = getDiscoveredToolNames();
@@ -280,18 +386,23 @@ No changes needed here.
 ```
 session_start:
   1. Load config + cache
-  2. registerTool() for each MCP tool from cache (full schema, direct execute)
-  3. registerTool("ToolSearch", ...) with catalog description
-  4. setActiveTools([...builtins, "ToolSearch"])
-  5. Connect keep-alive/eager servers in background
-  6. On connect → update metadata → re-register ToolSearch with fresh catalog
+  2. Initialize MCP lifecycle (connect eager/keep-alive servers, fetch metadata)
+  3. Wait for eager servers to connect (with timeout) so cache is populated
+  4. Capture builtinActive = pi.getActiveTools() (BEFORE any registerTool)
+  5. registerTool() for each MCP tool from cache (full schema, direct execute)
+     ↑ registerTool auto-activates each tool temporarily
+  6. registerTool("ToolSearch", ...) with catalog description (now populated)
+  7. setActiveTools([...builtinActive, "ToolSearch", ...directToolNames])
+     ↑ narrows back down: only builtins + ToolSearch + direct tools are active
+  8. On reconnect → update metadata → re-register ToolSearch with fresh catalog
 
 Each turn:
   LLM sees: builtins + ToolSearch (+ any previously discovered MCP tools)
-  LLM calls ToolSearch("slack send")
+  LLM calls ToolSearch("jetbrains find definition")
   → ToolSearch finds matches, setActiveTools([... + new tools])
-  → Returns full schemas in text
+  → Returns tool names + short descriptions (no schemas)
   Next turn: LLM calls the MCP tool directly with typed params
+  After turn: turn_end hook checks connection health, reconnects if needed
 
 session_end:
   flushMetadataCache(state)
@@ -299,6 +410,20 @@ session_end:
 ```
 
 ## Edge Cases
+
+### Compaction / session resume
+
+Track discovered tool names in a `Set<string>` in the extension's closure (survives compaction within session, resets on `session_start`). On resume, re-apply: `pi.setActiveTools([...builtins, "ToolSearch", ...directTools, ...discovered])`.
+
+```typescript
+let discoveredToolNames = new Set<string>();
+
+// In loadAndActivate:
+discoveredToolNames = new Set([...discoveredToolNames, ...found.map(t => t.name)]);
+
+// On session_start:
+discoveredToolNames = new Set(); // reset for new session
+```
 
 ### Server not connected when tool is called
 `createDirectToolExecutor` already handles this — lazy-connects, returns error if unreachable. No change needed.
@@ -310,24 +435,29 @@ The tool gets activated. When LLM calls it, `createDirectToolExecutor` tries to 
 ToolSearch supports `select:` for exact loading and keyword search. After first discovery, tools stay active.
 
 ### Cold start (no cache)
-First session: ToolSearch description shows "(not connected, cached)" for servers. After eager servers connect, description updates. LLM can still search cached metadata.
-
-### Compaction / session resume
-Discovered tools should be re-activated on resume. Track discovered names in session state or re-derive from message history.
+Eager servers are connected and metadata fetched BEFORE ToolSearch is registered. ToolSearch catalog is always populated from the start, even on a cold cache. Non-eager servers show as "(not connected)" but their tools are still listed from cache (if available) or omitted entirely.
 
 ## What Gets Deleted
 
 | File | What to remove |
 |------|---------------|
-| `pi-mcp-adapter.ts` | Proxy tool registration (`pi.registerTool({ name: "mcp", ... })`), the big `execute()` function |
+| `pi-mcp-adapter.ts` | The old `mcp` proxy tool (`pi.registerTool({ name: "mcp", ... })`), the big `execute()` function, `shouldRegisterProxyTool` logic, `getPiTools` helper, `missingConfiguredDirectToolServers` logic |
 | `proxy-modes.ts` | `executeCall`, `executeSearch`, `executeDescribe`, `executeList`, `executeConnect`. Keep `executeStatus` for `/mcp` command |
+| `types.ts` / config | Global `directTools` setting (`config.settings?.directTools`), `disableProxyTool` setting |
 
-## What Stays Unchanged
+## What Stays Unchanged (Mostly)
 
 | File | Why |
 |------|-----|
-| `direct-tools.ts` | `createDirectToolExecutor` is THE execution path for both direct and deferred tools. `buildProxyDescription()` kept for backward compat. `resolveDirectTools()` used to determine which tools bypass ToolSearch |
+| `direct-tools.ts` | `createDirectToolExecutor` is THE execution path for both direct and deferred tools. `resolveDirectTools()` used to determine which tools bypass ToolSearch. `buildProxyDescription()` removed (was for the old `mcp` tool description). |
 | `toon-encoder.ts` | Toon encoding in tool results still useful |
+
+## What Gets Tweaked
+
+| File | Change |
+|------|--------|
+| `types.ts` `formatToolName()` | Change separator from `_` to `__`: `p ? \`${p}__${toolName}\` : toolName`. This prevents ambiguity when server names contain underscores (e.g., `my_server__toolname` is unambiguous). Also update `parseToolNameParts()` accordingly — split on `__` to get server prefix, then split the rest on `_` for name parts. |
+| `types.ts` `normalizeToolName()` | Ensure it doesn't collapse double underscores: only replace `-` with `_`.
 
 ## What Gets Added
 
@@ -335,11 +465,49 @@ Discovered tools should be re-activated on resume. Track discovered names in ses
 |------|-------------|
 | `tool-search.ts` (NEW) | ToolSearch tool: search deferred tools, activate matches, return schemas |
 
+**Implementation notes for `tool-search.ts`:**
+
+```typescript
+// getAllDeferredTools: all registered MCP tools that are NOT direct
+function getAllDeferredTools(state: McpExtensionState): DeferredTool[] {
+  const directNames = new Set(state.directToolNames);
+  const deferred: DeferredTool[] = [];
+  for (const [serverName, tools] of state.toolMetadata.entries()) {
+    for (const tool of tools) {
+      const prefixed = formatToolName(tool.name, serverName, state.config.settings?.toolPrefix ?? "server");
+      if (!directNames.has(prefixed)) {
+        deferred.push({
+          name: prefixed,
+          originalName: tool.name,
+          description: tool.description || "",
+          serverName,
+          inputSchema: tool.inputSchema,
+        });
+      }
+    }
+  }
+  return deferred;
+}
+```
+
+**`turn_end` keep-alive hook (in `pi-mcp-adapter.ts`):**
+
+```typescript
+pi.on("turn_end", async () => {
+  if (!state) return;
+  for (const [serverName, serverState] of state.lifecycle.getAllServers()) {
+    if (serverState.status === "disconnected") {
+      await state.lifecycle.reconnect(serverName);
+    }
+  }
+});
+```
+
 ## Tool Modes Summary
 
 | Mode | Config | Tool visibility | Registration |
 |------|--------|----------------|--------------|
-| **Direct** | `directTools: true` or `directTools: ["tool1"]` per server, or global, or `MCP_DIRECT_TOOLS` env | Registered + **active** from session start. Full schema always in prompt. | Bypasses ToolSearch entirely |
+| **Direct** | `directTools: true` or `directTools: ["tool1"]` per server, or `MCP_DIRECT_TOOLS` env | Registered + **active** from session start. Full schema always in prompt. | Bypasses ToolSearch entirely |
 | **Deferred** | Everything else (default) | Registered but **inactive**. LLM discovers via ToolSearch. After discovery: activated with full schema. | Needs ToolSearch round-trip |
 
 Direct tools consume more tokens but are more reliable — no discovery step, schema always visible.

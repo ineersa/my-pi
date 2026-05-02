@@ -2,7 +2,7 @@
 name: reviewer
 description: Senior code reviewer — thorough security, correctness, and design analysis
 tools: read, grep, find, ls, bash, mcp:*
-thinking: high
+thinking: xhigh
 inheritProjectContext: true
 ---
 

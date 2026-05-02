@@ -5,11 +5,8 @@
     "directTools": true
   },
   "mcpServers": {
-    "context7": {
-      "url": "https://mcp.context7.com/mcp",
-      "headers": {
-        "CONTEXT7_API_KEY": "${CONTEXT7_API_KEY}"
-      },
+    "librarian": {
+      "url": "http://192.168.2.38:8093/_mcp?token=mcp_dd91c07fa288fae3c26334aaffb11249c97d1473f57ad2b7",
       "directTools": true
     },
     "websearch": {
