@@ -67,6 +67,7 @@ Package responsibilities:
 | intercom | [settings](packages/extensions/docs/extensions/intercom/settings.md) · [maintenance](packages/extensions/docs/extensions/intercom/maintenance.md) |
 | custom-compaction | [settings](packages/extensions/docs/extensions/custom-compaction/settings.md) · [maintenance](packages/extensions/docs/extensions/custom-compaction/maintenance.md) |
 | output-cap | [settings](packages/extensions/docs/extensions/output-cap/settings.md) · [maintenance](packages/extensions/docs/extensions/output-cap/maintenance.md) |
+| verbosity-control | [settings](packages/extensions/docs/extensions/verbosity-control/settings.md) · [maintenance](packages/extensions/docs/extensions/verbosity-control/maintenance.md) |
 | scheduler | [settings](packages/scheduler/docs/extensions/scheduler/settings.md) · [maintenance](packages/scheduler/docs/extensions/scheduler/maintenance.md) |
 | schedule_prompt (tool) | [settings](packages/scheduler/docs/tools/schedule_prompt/settings.md) · [maintenance](packages/scheduler/docs/tools/schedule_prompt/maintenance.md) |
 | jetbrains-index | [settings](packages/jetbrains-index/docs/extensions/jetbrains-index/settings.md) · [maintenance](packages/jetbrains-index/docs/extensions/jetbrains-index/maintenance.md) |

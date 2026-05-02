@@ -157,6 +157,17 @@
         "usage": "docs/extensions/ide/usage.md",
         "maintenance": "docs/extensions/ide/maintenance.md"
       }
+    },
+    {
+      "id": "verbosity-control",
+      "kind": "extension",
+      "name": "verbosity-control",
+      "entry": "./extensions/verbosity-control/verbosity-control.ts",
+      "docs": {
+        "settings": "docs/extensions/verbosity-control/settings.md",
+        "usage": "docs/extensions/verbosity-control/settings.md",
+        "maintenance": "docs/extensions/verbosity-control/maintenance.md"
+      }
     }
   ]
 }
