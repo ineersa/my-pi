@@ -12,4 +12,6 @@ export interface McpExtensionState {
   failureTracker: Map<string, number>;
   statsTracker?: McpStatsTracker;
   ui?: ExtensionContext["ui"];
+  /** Names of MCP tool names (prefixed) that bypass ToolSearch and are always active */
+  directToolNames: string[];
 }

@@ -62,6 +62,8 @@ export interface ServerEntry {
   bearerTokenEnv?: string;
   lifecycle?: "keep-alive" | "lazy" | "eager";
   idleTimeout?: number;
+  /** Per-server connection timeout in ms during startup. Default: 30_000 */
+  startupTimeoutMs?: number;
   exposeResources?: boolean;
   directTools?: boolean | string[];
   excludeTools?: string[];
@@ -76,8 +78,6 @@ export interface McpCaptureStatsSettings {
 export interface McpSettings {
   toolPrefix?: "server" | "none" | "short";
   idleTimeout?: number;
-  directTools?: boolean;
-  disableProxyTool?: boolean;
   toonEncode?: boolean | string[];
   captureStats?: boolean | McpCaptureStatsSettings;
 }
@@ -132,7 +132,7 @@ export function formatToolName(
   prefix: "server" | "none" | "short",
 ): string {
   const p = getServerPrefix(serverName, prefix);
-  return p ? `${p}_${toolName}` : toolName;
+  return p ? `${p}__${toolName}` : toolName;
 }
 
 function normalizeToolName(value: string): string {

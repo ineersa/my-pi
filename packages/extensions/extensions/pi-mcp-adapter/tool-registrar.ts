@@ -1,6 +1,6 @@
 // tool-registrar.ts - MCP content transformation
-// NOTE: Tools are NOT registered with Pi - only the unified `mcp` proxy tool is registered.
-// This keeps the LLM context small (1 tool instead of 100s).
+// NOTE: Tools are registered individually with Pi (both direct and deferred via ToolSearch).
+// Deferred tools are inactive until discovered — keeping the LLM visible context small.
 
 import type { McpContent, ContentBlock } from "./types.js";
 

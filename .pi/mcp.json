@@ -1,15 +1,19 @@
 {
   "settings": {
     "toolPrefix": "server",
-    "directTools": false,
-    "disableProxyTool": false,
     "toonEncode": ["jetbrains-index"]
   },
   "mcpServers": {
     "jetbrains-index": {
       "url": "http://127.0.0.1:29175/index-mcp/streamable-http",
       "headers": {},
-      "directTools": true,
+      "directTools": [
+        "ide_search_text",
+        "ide_diagnostics",
+        "ide_find_references",
+        "ide_find_file",
+        "ide_find_class"
+      ],
       "exposeResources": false
     }
   }

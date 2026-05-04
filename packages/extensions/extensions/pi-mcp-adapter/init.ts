@@ -1,6 +1,6 @@
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import type { McpExtensionState } from "./state.js";
-import type { ToolMetadata } from "./types.js";
+import type { ServerEntry, ToolMetadata } from "./types.js";
 import { existsSync } from "node:fs";
 import { loadMcpConfig } from "./config.js";
 import { McpLifecycleManager } from "./lifecycle.js";
@@ -45,6 +45,7 @@ export async function initializeMcp(
     failureTracker,
     statsTracker,
     ui,
+    directToolNames: [],
   };
 
   const serverEntries = Object.entries(config.mcpServers)
@@ -100,18 +101,38 @@ export async function initializeMcp(
     ctx.ui.setStatus("mcp", `MCP: connecting to ${startupServers.length} servers...`);
   }
 
+  const DEFAULT_STARTUP_TIMEOUT_MS = 30_000;
+  let anyTimedOut = false;
+
   const results = await parallelLimit(startupServers, 10, async ([name, definition]) => {
-    try {
-      const connection = await manager.connect(name, definition);
+    const timeoutMs = definition.startupTimeoutMs ?? DEFAULT_STARTUP_TIMEOUT_MS;
+
+    const connectPromise = manager.connect(name, definition).then(connection => {
       if (connection.status === "needs-auth") {
         return { name, definition, connection: null, error: `Server requires auth (disabled in this build): ${name}` };
       }
       return { name, definition, connection, error: null };
-    } catch (error) {
+    }).catch(error => {
       const message = error instanceof Error ? error.message : String(error);
       return { name, definition, connection: null, error: message };
+    });
+
+    const timeoutPromise = new Promise<{ name: string; definition: ServerEntry; connection: null; error: string }>(
+      resolve => setTimeout(() => {
+        resolve({ name, definition, connection: null, error: "Connection timed out" });
+      }, timeoutMs)
+    );
+
+    const result = await Promise.race([connectPromise, timeoutPromise]);
+    if (result.error === "Connection timed out") {
+      anyTimedOut = true;
     }
+    return result;
   });
+
+  if (anyTimedOut && ctx.hasUI) {
+    ctx.ui.notify("MCP: One or more server connections timed out during startup", "warning");
+  }
 
   for (const { name, definition, connection, error } of results) {
     if (error || !connection) {

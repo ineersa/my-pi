@@ -1,13 +1,13 @@
-import type { ExtensionAPI, ExtensionContext, ExtensionCommandContext, ToolInfo } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
 import type { McpExtensionState } from "./state.js";
 import { Type } from "@sinclair/typebox";
 import { showStatus, showTools, reconnectServers } from "./commands.js";
 import { loadMcpConfig } from "./config.js";
-import { buildProxyDescription, createDirectToolExecutor, getMissingConfiguredDirectToolServers, resolveDirectTools } from "./direct-tools.js";
-import { flushMetadataCache, initializeMcp } from "./init.js";
+import { createDirectToolExecutor, resolveDirectTools, BUILTIN_NAMES } from "./direct-tools.js";
+import { flushMetadataCache, initializeMcp, lazyConnect, updateServerMetadata, updateMetadataCache, updateStatusBar } from "./init.js";
 import { loadMetadataCache } from "./metadata-cache.js";
-import { executeCall, executeConnect, executeDescribe, executeList, executeSearch, executeStatus } from "./proxy-modes.js";
 import { getConfigPathFromArgv, truncateAtWord } from "./utils.js";
+import { createToolSearchTool } from "./tool-search.js";
 
 import { setMcpState } from "../mcp-shared-state.js";
 
@@ -51,6 +51,7 @@ export default function mcpAdapter(pi: ExtensionAPI) {
     }
   }
 
+  // --- Early config/cache loading (before session_start) ---
   const earlyConfigPath = getConfigPathFromArgv();
   const earlyConfig = loadMcpConfig(earlyConfigPath);
   const earlyCache = loadMetadataCache();
@@ -65,12 +66,11 @@ export default function mcpAdapter(pi: ExtensionAPI) {
         prefix,
         envRaw?.split(",").map(s => s.trim()).filter(Boolean),
       );
-  const missingConfiguredDirectToolServers = getMissingConfiguredDirectToolServers(earlyConfig, earlyCache);
-  const shouldRegisterProxyTool =
-    earlyConfig.settings?.disableProxyTool !== true
-    || directSpecs.length === 0
-    || missingConfiguredDirectToolServers.length > 0;
 
+  // Build a set of prefixed direct tool names for filtering in session_start
+  const earlyDirectToolNames = new Set(directSpecs.map(s => s.prefixedName));
+
+  // Register direct tools early (before session_start) so they are available immediately
   for (const spec of directSpecs) {
     pi.registerTool({
       name: spec.prefixedName,
@@ -82,13 +82,12 @@ export default function mcpAdapter(pi: ExtensionAPI) {
     });
   }
 
-  const getPiTools = (): ToolInfo[] => pi.getAllTools();
-
   pi.registerFlag("mcp-config", {
     description: "Path to MCP config file",
     type: "string",
   });
 
+  // --- session_start: initialize MCP, register all tools, wire ToolSearch ---
   pi.on("session_start", async (_event, ctx) => {
     const generation = ++lifecycleGeneration;
     const previousState = state;
@@ -119,13 +118,104 @@ export default function mcpAdapter(pi: ExtensionAPI) {
       }
 
       state = nextState;
-      setMcpState(nextState); // Share state with other extensions
+      setMcpState(nextState);
       initPromise = null;
+
+      // Non-null local reference for callbacks (TS narrows from closure)
+      const s = state;
+
+      // ----------------------------------------------------------------
+      // ToolSearch integration: register ALL tools + ToolSearch, narrow active set
+      // ----------------------------------------------------------------
+
+      // 1. Capture active tools BEFORE registering new ones (registerTool auto-activates)
+      const builtinActive = pi.getActiveTools();
+
+      // 2. Register ALL MCP tools from metadata with full schemas + direct executors
+      const directToolNames: string[] = [];
+      for (const [serverName, tools] of state.toolMetadata.entries()) {
+        for (const tool of tools) {
+          // Skip tools whose prefixed name collides with a builtin
+          if (BUILTIN_NAMES.has(tool.name)) {
+            console.warn(`MCP: skipping tool "${tool.name}" (collides with builtin)`);
+            continue;
+          }
+
+          const spec = {
+            serverName,
+            originalName: tool.originalName,
+            prefixedName: tool.name,
+            description: tool.description || "",
+            inputSchema: tool.inputSchema,
+            resourceUri: tool.resourceUri,
+          };
+
+          pi.registerTool({
+            name: tool.name,
+            label: `MCP: ${tool.originalName}`,
+            description: tool.description || "(no description)",
+            promptSnippet: truncateAtWord(tool.description, 100) || `MCP tool from ${serverName}`,
+            parameters: Type.Unsafe<Record<string, unknown>>(tool.inputSchema || { type: "object", properties: {} }),
+            execute: createDirectToolExecutor(() => state, () => initPromise, spec),
+          });
+
+          // Determine if this tool is direct (bypassed ToolSearch)
+          if (earlyDirectToolNames.has(tool.name)) {
+            directToolNames.push(tool.name);
+          }
+        }
+      }
+
+      // 3. Store direct tool names in state for ToolSearch to filter against
+      state.directToolNames = directToolNames;
+
+      // 4. Register ToolSearch (always active — the LLM uses it to discover deferred tools)
+      pi.registerTool(createToolSearchTool(() => state, pi));
+
+      // 5. Narrow active set: only builtins + ToolSearch + direct tools
+      // (builtinActive may include early-registered direct tools; Set dedup handles it)
+      const activeNames = [
+        ...builtinActive,
+        "ToolSearch",
+        ...directToolNames,
+      ];
+      pi.setActiveTools([...new Set(activeNames)]);
+
+      // 6. Override reconnect callback to also re-register ToolSearch with fresh catalog
+      s.lifecycle.setReconnectCallback((serverName) => {
+        updateServerMetadata(s, serverName);
+        updateMetadataCache(s, serverName);
+        s.failureTracker.delete(serverName);
+        updateStatusBar(s);
+
+        // Re-register ToolSearch so the LLM sees an updated catalog with new/refreshed tools
+        pi.registerTool(createToolSearchTool(() => s, pi));
+      });
     }).catch(() => {
       initPromise = null;
     });
   });
 
+  // --- turn_end keep-alive hook: reconnect disconnected keep-alive/eager servers ---
+  pi.on("turn_end", async () => {
+    if (!state) return;
+    for (const [serverName, definition] of Object.entries(state.config.mcpServers)) {
+      if (definition.enabled === false) continue;
+      // Only auto-reconnect servers that are meant to stay connected
+      const mode = definition.lifecycle ?? "lazy";
+      if (mode !== "keep-alive" && mode !== "eager") continue;
+      const connection = state.manager.getConnection(serverName);
+      if (!connection || connection.status !== "connected") {
+        try {
+          await lazyConnect(state, serverName);
+        } catch {
+          // Reconnect failures handled by lazyConnect with backoff
+        }
+      }
+    }
+  });
+
+  // --- /mcp command (unchanged) ---
   pi.registerCommand("mcp", {
     description: "Show MCP server status",
     handler: async (args: string, ctx: ExtensionCommandContext) => {
@@ -162,111 +252,4 @@ export default function mcpAdapter(pi: ExtensionAPI) {
       }
     },
   });
-
-  if (shouldRegisterProxyTool) {
-    pi.registerTool({
-      name: "mcp",
-      label: "MCP",
-      description: buildProxyDescription(earlyConfig, earlyCache, directSpecs),
-      promptSnippet: "MCP gateway - connect to MCP servers and call their tools",
-      parameters: Type.Object({
-        tool: Type.Optional(Type.String({ description: "Tool name to call (e.g., 'xcodebuild_list_sims')" })),
-        args: Type.Optional(Type.Union([
-          Type.Object({}, {
-            additionalProperties: true,
-            description: "Arguments as object (preferred), e.g. {\"key\":\"value\"}",
-          }),
-          Type.String({
-            description: "Arguments as JSON string (legacy), e.g. '{\"key\":\"value\"}'",
-          }),
-        ])),
-        connect: Type.Optional(Type.String({ description: "Server name to connect (lazy connect + metadata refresh)" })),
-        describe: Type.Optional(Type.String({ description: "Tool name to describe (shows parameters)" })),
-        search: Type.Optional(Type.String({ description: "Search tools by name/description" })),
-        regex: Type.Optional(Type.Boolean({ description: "Treat search as regex (default: substring match)" })),
-        includeSchemas: Type.Optional(Type.Boolean({ description: "Include parameter schemas in search results (default: true)" })),
-        server: Type.Optional(Type.String({ description: "Filter to specific server (also disambiguates tool calls)" })),
-      }),
-      async execute(_toolCallId, params: {
-        tool?: string;
-        args?: string | Record<string, unknown>;
-        connect?: string;
-        describe?: string;
-        search?: string;
-        regex?: boolean;
-        includeSchemas?: boolean;
-        server?: string;
-      }) {
-        let parsedArgs: Record<string, unknown> | undefined;
-        if (params.args !== undefined) {
-          if (typeof params.args === "string") {
-            let parsedValue: unknown;
-            try {
-              parsedValue = JSON.parse(params.args);
-            } catch (error) {
-              if (error instanceof SyntaxError) {
-                throw new Error(`Invalid args JSON: ${error.message}`, { cause: error });
-              }
-              throw error;
-            }
-
-            if (typeof parsedValue !== "object" || parsedValue === null || Array.isArray(parsedValue)) {
-              const gotType = Array.isArray(parsedValue)
-                ? "array"
-                : parsedValue === null
-                  ? "null"
-                  : typeof parsedValue;
-              throw new Error(`Invalid args: expected a JSON object, got ${gotType}`);
-            }
-
-            parsedArgs = parsedValue as Record<string, unknown>;
-          } else if (typeof params.args === "object" && params.args !== null && !Array.isArray(params.args)) {
-            parsedArgs = params.args;
-          } else {
-            const gotType = Array.isArray(params.args)
-              ? "array"
-              : params.args === null
-                ? "null"
-                : typeof params.args;
-            throw new Error(`Invalid args: expected JSON string or object, got ${gotType}`);
-          }
-        }
-
-        if (!state && initPromise) {
-          try {
-            state = await initPromise;
-          } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            return {
-              content: [{ type: "text" as const, text: `MCP initialization failed: ${message}` }],
-              details: { error: "init_failed", message },
-            };
-          }
-        }
-        if (!state) {
-          return {
-            content: [{ type: "text" as const, text: "MCP not initialized" }],
-            details: { error: "not_initialized" },
-          };
-        }
-
-        if (params.tool) {
-          return executeCall(state, params.tool, parsedArgs, params.server);
-        }
-        if (params.connect) {
-          return executeConnect(state, params.connect);
-        }
-        if (params.describe) {
-          return executeDescribe(state, params.describe);
-        }
-        if (params.search) {
-          return executeSearch(state, params.search, params.regex, params.server, params.includeSchemas, getPiTools);
-        }
-        if (params.server) {
-          return executeList(state, params.server);
-        }
-        return executeStatus(state);
-      },
-    });
-  }
 }
