@@ -77,7 +77,7 @@ export default function mcpAdapter(pi: ExtensionAPI) {
       label: `MCP: ${spec.originalName}`,
       description: spec.description || "(no description)",
       promptSnippet: truncateAtWord(spec.description, 100) || `MCP tool from ${spec.serverName}`,
-      parameters: Type.Unsafe<Record<string, unknown>>(spec.inputSchema || { type: "object", properties: {} }),
+      parameters: Type.Unsafe<Record<string, unknown>>(spec.inputSchema || { type: "object", properties: {} }) as any,
       execute: createDirectToolExecutor(() => state, () => initPromise, spec),
     });
   }
@@ -155,7 +155,7 @@ export default function mcpAdapter(pi: ExtensionAPI) {
             label: `MCP: ${tool.originalName}`,
             description: tool.description || "(no description)",
             promptSnippet: truncateAtWord(tool.description, 100) || `MCP tool from ${serverName}`,
-            parameters: Type.Unsafe<Record<string, unknown>>(tool.inputSchema || { type: "object", properties: {} }),
+            parameters: Type.Unsafe<Record<string, unknown>>(tool.inputSchema || { type: "object", properties: {} }) as any,
             execute: createDirectToolExecutor(() => state, () => initPromise, spec),
           });
 

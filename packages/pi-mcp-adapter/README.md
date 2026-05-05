@@ -212,7 +212,7 @@ The agent calls `ToolSearch({ query: "files" })`, discovers matching tools, and 
 
 ## License
 
-MIT © 2026 Nico Bailon
+MIT © 2026 Nico Bailon (original) · Ineersa (fork additions: ToolSearch, TOON encoding, direct tool activation)
 
 This project is a fork of [pi-mcp-adapter](https://github.com/nicobailon/pi-mcp-adapter) by Nico Bailon, modified and maintained as part of the [my-pi](https://github.com/ineersa/my-pi) monorepo. All original copyright and permission notices are preserved. See [LICENSE](LICENSE) for the full text.
 

@@ -1,6 +1,6 @@
 {
   "name": "@ineersa/my-pi-mcp-adapter",
-  "version": "0.1.8",
+  "version": "0.1.10",
   "description": "MCP (Model Context Protocol) adapter extension for Pi coding agent — bridges any MCP server into Pi as first-class tools",
   "type": "module",
   "keywords": [
@@ -20,16 +20,12 @@
   "bugs": {
     "url": "https://github.com/ineersa/my-pi/issues"
   },
-  "bin": {
-    "pi-mcp-adapter": "cli.js"
-  },
   "pi": {
     "extensions": [
       "./pi-mcp-adapter.ts"
     ]
   },
   "files": [
-    "cli.js",
     "pi-mcp-adapter.ts",
     "state.ts",
     "utils.ts",
@@ -46,7 +42,6 @@
     "metadata-cache.ts",
     "npx-resolver.ts",
     "logger.ts",
-    "errors.ts",
     "tool-search.ts",
     "toon-encoder.ts",
     "stats.ts",
@@ -54,9 +49,11 @@
     "docs",
     "docs/examples.md",
     "README.md",
-    "CHANGELOG.md",
     "LICENSE",
-    "!**/*.test.ts"
+    "docs/architecture.md",
+    "docs/extensions/pi-mcp-adapter/settings.md",
+    "docs/extensions/pi-mcp-adapter/usage.md",
+    "docs/extensions/pi-mcp-adapter/maintenance.md"
   ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.25.1",

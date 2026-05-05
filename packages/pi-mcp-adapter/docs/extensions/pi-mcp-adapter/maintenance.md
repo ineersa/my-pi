@@ -23,7 +23,6 @@ Entry: `pi-mcp-adapter.ts`
 | `npx-resolver.ts` | npx binary resolution. Parses `npx` args, resolves actual bin path from npm cache, bypasses the ~143MB npm parent process. Persistent cache at `~/.pi/agent/mcp-npx-cache.json` (24h TTL). Falls back to original `npx` on failure. |
 | `toon-encoder.ts` | `maybeEncodeToon()` — optionally encodes JSON tool responses as TOON when shorter. Applied to successful results only. `isToonEnabled()` checks per-server config. |
 | `stats.ts` | `McpStatsTracker` — optional per-server/per-tool call counters. Debounced file writes (default 750ms). `createStatsTracker()` parses `settings.captureStats`. |
-| `errors.ts` | Structured error types (`McpUiError` hierarchy): ResourceFetchError, ResourceParseError, BridgeConnectionError, ConsentError, SessionError, ServerError, McpServerError. `wrapError()` helper. |
 | `logger.ts` | Singleton `logger` with debug/info/warn/error levels. Child logger support, MCP_UI_DEBUG env var. |
 
 ## Key Lifecycle Events

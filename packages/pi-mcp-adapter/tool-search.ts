@@ -310,7 +310,7 @@ export function createToolSearchTool(
           + "(e.g. \"select:jetbrains_index__ide_find_definition\"), "
           + "or use keywords like \"jetbrains find definition\" to search by name/description.",
       }),
-    }),
+    }) as any,
     async execute(
       _toolCallId: string,
       params: { query: string },

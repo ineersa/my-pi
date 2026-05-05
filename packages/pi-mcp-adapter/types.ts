@@ -107,13 +107,7 @@ export interface DirectToolSpec {
   resourceUri?: string;
 }
 
-export interface ServerProvenance {
-  path: string;
-  kind: "user" | "project" | "import";
-  importKind?: string;
-}
-
-export function getServerPrefix(
+function getServerPrefix(
   serverName: string,
   mode: "server" | "none" | "short",
 ): string {

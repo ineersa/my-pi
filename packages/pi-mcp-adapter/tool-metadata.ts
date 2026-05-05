@@ -49,24 +49,12 @@ export function buildToolMetadata(
   return { metadata, failedTools };
 }
 
-export function getToolNames(state: McpExtensionState, serverName: string): string[] {
-  return state.toolMetadata.get(serverName)?.map(m => m.name) ?? [];
-}
-
 export function totalToolCount(state: McpExtensionState): number {
   let count = 0;
   for (const metadata of state.toolMetadata.values()) {
     count += metadata.length;
   }
   return count;
-}
-
-export function findToolByName(metadata: ToolMetadata[] | undefined, toolName: string): ToolMetadata | undefined {
-  if (!metadata) return undefined;
-  const exact = metadata.find(m => m.name === toolName);
-  if (exact) return exact;
-  const normalized = toolName.replace(/-/g, "_");
-  return metadata.find(m => m.name.replace(/-/g, "_") === normalized);
 }
 
 export function formatSchema(schema: unknown, indent = "  "): string {

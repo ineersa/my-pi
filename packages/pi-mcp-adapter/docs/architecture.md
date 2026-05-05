@@ -114,7 +114,6 @@ pi-mcp-adapter.ts          ← Entry point, tool registration, lifecycle hooks
 ├── resource-tools.ts      ← MCP resource name → tool name normalization
 ├── toon-encoder.ts        ← Optional TOON encoding of JSON responses
 ├── stats.ts               ← Optional call statistics tracking
-├── errors.ts              ← Structured error types (legacy UI integration)
 └── logger.ts              ← Structured logging with levels
 ```
 
@@ -138,7 +137,6 @@ pi-mcp-adapter.ts
 ├── toon-encoder.ts    → types.ts, (@toon-format/toon)
 ├── npx-resolver.ts    → (fs, child_process)
 ├── resource-tools.ts  → (no internal deps)
-├── errors.ts          → (no internal deps, standalone)
 └── logger.ts          → (no internal deps, standalone)
 ```
 
