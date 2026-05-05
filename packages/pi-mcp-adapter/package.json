@@ -52,6 +52,7 @@
     "stats.ts",
     "mcp-shared-state.ts",
     "docs",
+    "docs/examples.md",
     "README.md",
     "CHANGELOG.md",
     "LICENSE",

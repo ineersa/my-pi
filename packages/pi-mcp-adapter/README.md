@@ -1,44 +1,57 @@
-# pi-mcp-adapter
+# @ineersa/my-pi-mcp-adapter
 
-> **MCP (Model Context Protocol) adapter for [Pi coding agent](https://github.com/badlogic/pi-mono).**
-> Bridges any MCP server into Pi as first-class tools — with token-efficient ToolSearch
-> discovery, lazy/eager/keep-alive lifecycle, metadata caching, and zero-build runtime.
+> **MCP (Model Context Protocol) bridge for [Pi coding agent](https://github.com/badlogic/pi-mono).**
+> ToolSearch discovery · direct tools · lazy/eager/keep-alive lifecycle · TOON encoding · metadata cache.
+
+[![npm](https://img.shields.io/npm/v/@ineersa/my-pi-mcp-adapter)](https://www.npmjs.com/package/@ineersa/my-pi-mcp-adapter)
+[![license](https://img.shields.io/npm/l/@ineersa/my-pi-mcp-adapter)](LICENSE)
 
 ---
 
-## Features
+## ⚠️ Requirement
 
-- [ToolSearch discovery](#example-1-toolsearch-discovery) — search and load any MCP tool by keyword. Saves ~2000+ tokens/turn vs shipping all schemas.
-- [Direct tool registration](#example-2-direct-tool-registration) — promote frequently-used MCP tools to always-active first-class Pi tools.
-- [Lazy startup by default](#example-3-lazy-startup-by-default) — servers connect on first tool call. No startup delay.
-- [Three lifecycle modes](#example-4-three-lifecycle-modes) — `lazy` (on demand), `eager` (connect at startup), `keep-alive` (auto-reconnect).
-- [Idle timeout](#example-5-idle-timeout) — 10 minute default; configurable per-server or globally. Set `0` to disable.
-- [Metadata cache](#example-6-metadata-cache) — `~/.pi/agent/mcp-cache.json` enables tool registration without live connections. 7-day TTL with SHA256 config hashing.
-- [npx binary resolution](#example-7-npx-binary-resolution) — resolves `npx` packages to direct binary paths, eliminating ~143MB npm parent process per server.
-- [TOON encoding](#example-8-toon-encoding) — optional JSON→TOON compression for token-efficient MCP responses (—27% on JetBrains search results).
-- [Call statistics](#example-9-call-statistics) — optional per-server/per-tool counters with debounced flush to `.pi/mcp-tool-stats.json`.
-- [Config imports](#example-10-config-imports) — import MCP servers from Cursor, Claude Code, Claude Desktop, Codex, Windsurf, VS Code.
-- [Project-local config](#example-11-project-local-config) — `.pi/mcp.json` overrides user-global `~/.pi/agent/mcp.json`.
-- [Resource tools](#example-12-resource-tools) — MCP resources exposed as callable Pi tools (`get_resource_name`).
-- [Failure backoff](#example-13-failure-backoff) — 60s cooldown after failed connections to avoid connection storms.
-- [Bear your own auth](#example-14-bear-your-own-auth) — bearer token with env-var or static config; OAuth servers report `needs-auth` and skip tool calls.
-- [Builtin collision guard](#example-15-builtin-collision-guard) — tools whose prefixed name shadows a builtin (`read`, `bash`, `edit`, etc.) are silently skipped.
-- [Cross-server deduplication](#example-16-cross-server-deduplication) — handles name collisions in `prefix: "none"` and `prefix: "short"` modes.
-- [Status bar](#example-17-status-bar) — shows connected/total server count in Pi footer.
+This extension **requires** pi-mono from the [`refresh-tools-between-turns`](https://github.com/ineersa/pi-mono/tree/refresh-tools-between-turns) branch.
+
+> The `setActiveTools` API is not yet in pi-mono `main`. Without this branch, ToolSearch cannot activate discovered tools, and direct tool registration won't work correctly.
+
+---
+
+## Why this fork?
+
+This is a **slimmed, enhanced fork** of Nico Bailon's excellent [pi-mcp-adapter](https://github.com/nicobailon/pi-mcp-adapter). Here's what's different:
+
+| Feature | Upstream (Nico) | This fork |
+|---|---|---|
+| **Tool discovery** | Single `mcp` mega-tool with JSON-in-JSON args | **ToolSearch** — search by keyword, load exact tools. Each MCP tool has its own typed schema. |
+| **Token efficiency** | ~200 tokens for proxy, but LLM must construct args-as-JSON | **~2000+ tokens saved per turn** by only shipping active tool schemas |
+| **Direct tools** | `directTools` in config | Same, plus `MCP_DIRECT_TOOLS` env var for subagents |
+| **TOON encoding** | — | **−27% token savings** on JetBrains search results via [TOON](https://github.com/toon-format/toon) compression |
+| **`/mcp` panel** | Interactive TUI overlay | Text-based status (`/mcp`, `/mcp tools`, `/mcp reconnect`) |
+| **OAuth flows** | Full OAuth with callback server | `needs-auth` detection only — tool calls gracefully skipped |
+| **MCP UI** | Browser/Glimpse integration | Not included |
+| **Tool activation** | Proxy-based (all tools through one schema) | Individual tool registration — each MCP tool is a first-class Pi tool with its own typed schema |
+
+**The key architectural shift:** Instead of a single `mcp` proxy tool with generic `{tool?, args?, search?, connect?}` schema, every MCP tool is registered individually with its full typed schema. ToolSearch gives the LLM keyword-based discovery, and only the tools it needs are active at any time. This saves thousands of tokens per turn while making tool calls type-safe.
 
 ---
 
 ## Quick Start
 
-### 1. Install
+### Install
 
-This extension is bundled in `@ineersa/my-pi-extensions`. If not already installed:
+This package is part of the my-pi monorepo. Install via the one-command installer:
 
 ```bash
-pi install npm:@ineersa/my-pi-extensions
+npx @ineersa/my-pi
 ```
 
-### 2. Configure a server
+Or install standalone:
+
+```bash
+pi install npm:@ineersa/my-pi-mcp-adapter
+```
+
+### Configure a server
 
 Create `~/.pi/agent/mcp.json`:
 
@@ -53,754 +66,47 @@ Create `~/.pi/agent/mcp.json`:
 }
 ```
 
-### 3. Reload & discover
+### Reload & discover
 
 ```
 /reload
 ```
 
-Then ask the agent to find your tools:
+Then ask your agent:
 
-```
-"Search for available MCP tools related to files"
-```
+> "Search for available MCP tools related to files"
 
-The agent calls `ToolSearch(...)` → discovers matching tools → next turn uses them with full typed schemas.
+The agent calls `ToolSearch({ query: "files" })`, discovers matching tools, and uses them with full typed schemas on the next turn.
 
 ---
 
-## Example 1: ToolSearch Discovery
+## Features at a glance
 
-**What it does:** The LLM sees one `ToolSearch` tool in its active list instead of 70+ MCP tool schemas. When it needs a specific tool, it searches by keyword and the tool is activated for the next turn.
-
-```json
-{
-  "settings": { "toolPrefix": "server" },
-  "mcpServers": {
-    "jetbrains-index": {
-      "url": "http://127.0.0.1:29175/index-mcp/streamable-http"
-      // No directTools = all tools are deferred (discoverable via ToolSearch)
-    }
-  }
-}
-```
-
-**Usage:**
-
-```
-Turn 1: ToolSearch({ query: "jetbrains find definition" })
-        → "Loaded 3 tools: jetbrains_index__ide_find_definition,
-           jetbrains_index__ide_find_references,
-           jetbrains_index__ide_find_super_methods"
-
-Turn 2: jetbrains_index__ide_find_definition({ file: "src/Main.java", line: 15, column: 10 })
-        → Returns the symbol definition with full preview
-```
-
-**Select mode** — load exact tools by prefixed name (bypasses keyword search):
-
-```typescript
-ToolSearch({ query: "select:jetbrains_index__ide_search_text,jetbrains_index__ide_diagnostics" })
-```
-
-**Search algorithm:** weighted scoring over tool name parts and descriptions:
-
-| Score | Condition |
-|---|---|
-| 10 | Query term matches a tool name part **exactly** |
-| 5 | Query term is a **substring** of a tool name part |
-| 4 | Word-boundary match in the **description** |
-| 3 | Query term is contained in the **full tool name** (fallback) |
-
-Max 5 results per search.
-
----
-
-## Example 2: Direct Tool Registration
-
-**What it does:** Selected MCP tools are registered as first-class Pi tools from the very first
-turn. No discovery round-trip needed. Configured per-server.
-
-**All tools from a server are direct:**
-
-```json
-{
-  "mcpServers": {
-    "librarian": {
-      "url": "http://localhost:8093/mcp",
-      "directTools": true
-    }
-  }
-}
-```
-
-**Only specific tools are direct (rest stay deferred):**
-
-```json
-{
-  "mcpServers": {
-    "jetbrains-index": {
-      "url": "http://127.0.0.1:29175/index-mcp/streamable-http",
-      "directTools": [
-        "ide_search_text",
-        "ide_diagnostics",
-        "ide_find_references",
-        "ide_find_file",
-        "ide_find_class"
-      ]
-    }
-  }
-}
-```
-
-**Via environment variable (useful for subagents):**
-
-```bash
-MCP_DIRECT_TOOLS=playwright,database/query_tables pi
-```
-
-- `*` — all servers are direct
-- `server_name` — all tools from that server
-- `server_name/tool_name` — specific tool
-- `__none__` — no direct tools (override all config)
-
-**Performance tip:** use stats (see [Example 9](#example-9-call-statistics)) to find your
-most-used tools and set only those as direct. In a typical JetBrains session with 200 calls,
-the top 5 tools covered 94.5% of usage while the remaining 9+ stayed deferred.
-
----
-
-## Example 3: Lazy Startup by Default
-
-**What it does:** Servers default to `lifecycle: "lazy"` — they connect only when a tool call
-needs them. Pi starts instantly regardless of how many servers are configured.
-
-```json
-{
-  "mcpServers": {
-    "rarely-used-db": {
-      "url": "http://localhost:9090/sse"
-      // lifecycle defaults to "lazy"
-    }
-  }
-}
-```
-
-The server stays disconnected until the agent calls one of its tools. On first call,
-`createDirectToolExecutor` triggers a lazy connect with 60s failure backoff.
-
----
-
-## Example 4: Three Lifecycle Modes
-
-**What it does:** Controls when servers connect and whether they auto-reconnect.
-
-| Mode | Startup Connection | Reconnect | Idle Timeout |
-|---|---|---|---|
-| `lazy` (default) | No | On first tool call | Yes (global default) |
-| `eager` | Yes (session start) | Via `turn_end` hook | 0 (disabled) |
-| `keep-alive` | Yes (session start) | 30s health check | Yes (global default) |
-
-**Eager — connect at startup, no reconnect:**
-
-```json
-{
-  "mcpServers": {
-    "critical-server": {
-      "command": "npx", "-y", "important-mcp",
-      "lifecycle": "eager",
-      "startupTimeoutMs": 15000
-    }
-  }
-}
-```
-
-Connects during `session_start` with a 15-second timeout. If it fails, the error is shown
-once. No reconnect attempts — assume server is always running.
-
-**Keep-alive — connect at startup + auto-reconnect:**
-
-```json
-{
-  "mcpServers": {
-    "daemon-server": {
-      "url": "http://localhost:1234/sse",
-      "lifecycle": "keep-alive"
-    }
-  }
-}
-```
-
-Health check runs every 30 seconds. If the server disconnects, it's reconnected
-automatically. Tool metadata is refreshed on reconnect.
-
-**Lazy (default) — connect on demand:**
-
-```json
-{
-  "mcpServers": {
-    "occasional-server": {
-      "command": "npx", "-y", "rarely-used-mcp"
-    }
-  }
-}
-```
-
----
-
-## Example 5: Idle Timeout
-
-**What it does:** Connected servers are automatically disconnected after inactivity to
-save resources. On next tool call, they reconnect lazily.
-
-**Global idle timeout (applies to all servers):**
-
-```json
-{
-  "settings": {
-    "idleTimeout": 30
-  }
-}
-```
-
-30 minutes of inactivity before shutdown.
-
-**Per-server override:**
-
-```json
-{
-  "mcpServers": {
-    "chatty-server": {
-      "url": "http://localhost:5000/sse",
-      "lifecycle": "keep-alive",
-      "idleTimeout": 5
-    },
-    "always-hot": {
-      "url": "http://localhost:6000/sse",
-      "idleTimeout": 0          // never idle-shut down
-    }
-  }
-}
-```
-
-**Defaults:**
-- Global: 10 minutes
-- Eager servers: 0 (never idle)
-- In-flight tool calls block idle shutdown (tracks `inFlight` counter)
-
----
-
-## Example 6: Metadata Cache
-
-**What it does:** Tool and resource metadata is cached to `~/.pi/agent/mcp-cache.json`
-so Pi can register tools without connecting to servers on every startup.
-
-**Cache entry per server:**
-
-```json
-{
-  "version": 1,
-  "servers": {
-    "jetbrains-index": {
-      "configHash": "sha256...",
-      "tools": [
-        { "name": "ide_search_text", "description": "Search using IDE word index", "inputSchema": { ... } },
-        { "name": "ide_find_references", "description": "Find symbol references", "inputSchema": { ... } }
-      ],
-      "resources": [],
-      "cachedAt": 1743545600000
-    }
-  }
-}
-```
-
-**Cache invalidation triggers:**
-
-- Config hash changes (different `command`, `url`, `args`, `headers`, etc.)
-- Cache is older than 7 days
-- Server is missing from cache entirely
-
-When a server's cache is invalid, it's connected fresh on next `session_start`.
-
-**Direct tools are registered from cache** at module load time (before `session_start`),
-so they're available on turn 1 even on cold start (cache populates after first connection).
-
----
-
-## Example 7: npx Binary Resolution
-
-**What it does:** Instead of running `npx some-mcp` (which spawns a ~143MB npm parent
-process per server), the extension resolves the actual binary path from npm's cache and
-invokes it directly with `node` or executes the binary.
-
-```json
-{
-  "mcpServers": {
-    "playwright": {
-      "command": "npx",
-      "args": ["-y", "@anthropic/playwright-mcp"]
-    }
-  }
-}
-```
-
-Under the hood, this resolves to something like:
-
-```
-node /home/user/.npm/_npx/abc123/node_modules/@anthropic/playwright-mcp/dist/index.js
-```
-
-**Resolution cache:** `~/.pi/agent/mcp-npx-cache.json` (24h TTL).
-
-If resolution fails (uncached package, network issue), the extension falls back to the
-original `npx` command transparently.
-
----
-
-## Example 8: TOON Encoding
-
-**What it does:** JSON tool responses are compressed using the
-[TOON format](https://github.com/toon-format/toon) to reduce token usage. Only applied
-when output is shorter than the original JSON.
-
-**Enable for all servers:**
-
-```json
-{
-  "settings": {
-    "toonEncode": true
-  }
-}
-```
-
-**Enable for specific servers:**
-
-```json
-{
-  "settings": {
-    "toonEncode": ["jetbrains-index", "librarian"]
-  }
-}
-```
-
-**Benchmark (JetBrains MCP responses):**
-
-| Scenario | JSON Compact | TOON | Savings |
-|---|---|---|---|
-| `search_text` (30 results) | 1,399 tok | 1,021 tok | **−27%** |
-| `find_references` (100 results) | 6,195 tok | 4,705 tok | **−24%** |
-
-TOON only applies to successful tool call results. Errors and non-JSON text pass through
-unchanged. Best for servers that return uniform arrays of objects.
-
-**Dependency:** `@toon-format/toon` (bundled with the extension).
-
----
-
-## Example 9: Call Statistics
-
-**What it does:** Captures per-server, per-tool call counters to a project-local JSON file.
-Useful for understanding which tools you actually use (see our
-[direct tools decision](#example-2-direct-tool-registration)).
-
-**Enable with defaults (writes to `.pi/mcp-tool-stats.json`):**
-
-```json
-{
-  "settings": {
-    "captureStats": true
-  }
-}
-```
-
-**Custom path and flush delay:**
-
-```json
-{
-  "settings": {
-    "captureStats": {
-      "path": ".pi/mcp-stats/monitoring.json",
-      "flushDelayMs": 500
-    }
-  }
-}
-```
-
-**Reading the stats file** (after a session):
-
-```json
-{
-  "version": 1,
-  "projectRoot": "/home/user/projects/my-app",
-  "servers": {
-    "jetbrains-index": {
-      "calls": 200,
-      "success": 199,
-      "errors": 1,
-      "directCalls": 200,
-      "tools": {
-        "ide_search_text": {
-          "calls": 106,
-          "success": 105,
-          "errors": 1,
-          "errorCodes": { "tool_error": 1 },
-          "lastCalledAt": "2026-04-25T16:43:32Z"
-        },
-        "ide_diagnostics": {
-          "calls": 43,
-          "success": 43,
-          "errors": 0,
-          "errorCodes": {},
-          "lastCalledAt": "2026-04-24T13:11:28Z"
-        }
-      }
-    }
-  }
-}
-```
-
-**Captured counters per tool:** `calls`, `success`, `errors`, `errorCodes` buckets,
-`lastCalledAt`, `lastSuccessAt`, `lastErrorAt`.
-
-Stats flush on session shutdown and after the configured debounce delay.
-
----
-
-## Example 10: Config Imports
-
-**What it does:** Import MCP server definitions from other tools you already use.
-Local config takes precedence over imports, so you can override specific servers.
-
-```json
-{
-  "imports": ["cursor", "claude-code", "claude-desktop", "codex", "windsurf", "vscode"],
-  "mcpServers": {
-    "my-custom-server": {
-      "command": "npx",
-      "args": ["-y", "custom-mcp"]
-    }
-  }
-}
-```
-
-**Supported import sources:**
-
-| Kind | Config Path |
-|---|---|
-| `cursor` | `~/.cursor/mcp.json` |
-| `claude-code` | `~/.claude/claude_desktop_config.json` |
-| `claude-desktop` | `~/Library/Application Support/Claude/claude_desktop_config.json` |
-| `codex` | `~/.codex/config.json` |
-| `windsurf` | `~/.windsurf/mcp.json` |
-| `vscode` | `.vscode/mcp.json` (project-relative) |
-
-**Merge rules:**
-1. User config (`~/.pi/agent/mcp.json`) is the base
-2. Imported servers are added (only if not already defined)
-3. Project config (`.pi/mcp.json`) overrides everything
-
----
-
-## Example 11: Project-Local Config
-
-**What it does:** Each project can have its own `.pi/mcp.json` that overrides the
-user-global `~/.pi/agent/mcp.json`. Perfect for project-specific tooling.
-
-**`.pi/mcp.json` (project root):**
-
-```json
-{
-  "mcpServers": {
-    "project-tools": {
-      "command": "npx",
-      "args": ["-y", "project-specific-mcp"],
-      "lifecycle": "eager"
-    }
-  },
-  "settings": {
-    "toolPrefix": "short"
-  }
-}
-```
-
-**Merge priority:**
-
-```
-~/.pi/agent/mcp.json  (base)
-  ↓ imports (cursor, claude, etc.)
-    ↓ .pi/mcp.json  (highest — overrides everything)
-```
-
-Project settings merge with user settings (user is base, project overrides individual keys).
-
----
-
-## Example 12: Resource Tools
-
-**What it does:** MCP resources (files, data endpoints) are automatically exposed as
-callable Pi tools named `get_resource_name`.
-
-**Server-side (exposes resources):**
-
-```json
-{
-  "mcpServers": {
-    "docs-server": {
-      "url": "http://localhost:7000/sse"
-      // exposeResources defaults to true
-    }
-  }
-}
-```
-
-**Resulting tools:**
-- If the server provides a resource named `project-readme` with URI `docs://readme`
-- Pi registers: `docs_server__get_project_readme` as a callable tool
-- Calling it reads the resource via the MCP `resources/read` endpoint
-
-**To disable resource tools:**
-
-```json
-{
-  "mcpServers": {
-    "jetbrains-index": {
-      "url": "http://127.0.0.1:29175/index-mcp/streamable-http",
-      "exposeResources": false
-    }
-  }
-}
-```
-
-Resource name normalization: `resourceNameToToolName()` strips special characters,
-collapses underscores, and ensures a valid JS identifier.
-
----
-
-## Example 13: Failure Backoff
-
-**What it does:** When a server fails to connect, subsequent attempts are blocked for
-60 seconds. This prevents connection storms when a server is down.
-
-```json
-{
-  "mcpServers": {
-    "flakey-server": {
-      "url": "http://localhost:9999/sse"
-    }
-  }
-}
-```
-
-**Failure flow:**
-
-```
-Turn 1:  Agent calls tool on flakey-server
-         → lazyConnect fails, stores failure timestamp
-         → Returns "server not available (failed 0s ago)"
-
-Turn 2:  Agent calls another tool on flakey-server
-         → failureBackoff still active
-         → Returns "server not available (failed 30s ago)"
-
-1 min later:
-         Agent calls tool again
-         → Failure expired
-         → lazyConnect retries the connection
-```
-
-Failure timestamps are stored in `failureTracker` (in-memory, resets on session restart).
-
----
-
-## Example 14: Bear Your Own Auth
-
-**What it does:** Supports bearer token authentication for HTTP servers. OAuth servers
-are detected and reported as `needs-auth` — tool calls are skipped instead of blocking.
-
-**Bearer token from env var:**
-
-```json
-{
-  "mcpServers": {
-    "auth-server": {
-      "url": "https://api.example.com/mcp",
-      "auth": "bearer",
-      "bearerTokenEnv": "MY_MCP_TOKEN"
-    }
-  }
-}
-```
-
-**Bearer token inline (less secure):**
-
-```json
-{
-  "mcpServers": {
-    "auth-server": {
-      "url": "https://api.example.com/mcp",
-      "auth": "bearer",
-      "bearerToken": "sk-abc123..."
-    }
-  }
-}
-```
-
-**Token interpolation in headers and env vars:**
-
-```json
-{
-  "mcpServers": {
-    "api-server": {
-      "url": "http://localhost:8000/sse",
-      "headers": {
-        "Authorization": "Bearer ${AUTH_TOKEN}",
-        "X-Custom": "$env:CUSTOM_HEADER"
-      },
-      "env": {
-        "API_KEY": "${API_KEY}"
-      }
-    }
-  }
-}
-```
-
-Both `${VAR}` and `$env:VAR` syntaxes are supported.
-
-**OAuth servers:** If a server returns `UnauthorizedError` during connect, it enters
-`needs-auth` state. All tool calls return a descriptive error instead of trying to
-connect. No OAuth flow is implemented in this slimmed fork.
-
----
-
-## Example 15: Builtin Collision Guard
-
-**What it does:** If an MCP tool's prefixed name collides with a Pi builtin
-(`read`, `bash`, `edit`, `write`, `grep`, `find`, `ls`), it's silently skipped with a
-warning.
-
-```json
-{
-  "mcpServers": {
-    "dangerous": {
-      "command": "npx", "-y", "badly-named-mcp",
-      // If this server exposes a tool called "read",
-      // it's skipped — the builtin `read` always wins
-      "directTools": true
-    }
-  }
-}
-```
-
-**Warning in logs:**
-
-```
-MCP: skipping tool "read" (collides with builtin)
-MCP: skipping direct tool "bash" (collides with builtin)
-```
-
-This applies to both direct and deferred tools. The collision is checked against
-the **prefixed** name (e.g., `dangerous_read`), so collisions are rare unless using
-`prefix: "none"`.
-
----
-
-## Example 16: Cross-server Deduplication
-
-**What it does:** When `prefix: "short"` or `prefix: "none"` produces the same tool name
-from different servers, only the first one is registered.
-
-```json
-{
-  "settings": {
-    "toolPrefix": "none"
-  },
-  "mcpServers": {
-    "server-a": {
-      "command": "npx", "-y", "package-a"
-      // exposes tool "get_data"
-    },
-    "server-b": {
-      "command": "npx", "-y", "package-b"
-      // also exposes tool "get_data" — COLLISION
-    }
-  }
-}
-```
-
-With `prefix: "none"`, both tools would be named `get_data`.
-The first one registered wins; the second is skipped with a console warning:
-
-```
-MCP: skipping duplicate direct tool "get_data" from "server-b"
-```
-
-**Prefix modes & how they avoid collisions:**
-
-| Mode | Example Name | Collision Risk |
+| Feature | Description | More |
 |---|---|---|
-| `server` (default) | `server_a__get_data` | Low — server name disambiguates |
-| `short` | `a__get_data` | Medium — short names may overlap |
-| `none` | `get_data` | High — raw tool names |
-
----
-
-## Example 17: Status Bar
-
-**What it does:** Shows the MCP connection status in Pi's footer as a compact indicator.
-
-When connected to 5 out of 6 servers:
-
-```
-MCP: 5/6 servers
-```
-
-When all servers are disabled or none configured, the status bar entry is hidden.
-
-The status bar updates:
-- After `session_start` (initial connect)
-- When a server connects or reconnects
-- When a server is closed (idle timeout or manual)
-- After `/mcp reconnect`
-
-**Customization**: the status color uses the `accent` theme color. There's no
-per-server granularity in the status bar — use `/mcp` for details.
-
----
-
-## Usage Reference
-
-### Commands
-
-| Command | Description |
-|---|---|
-| `/mcp` or `/mcp status` | Show server connection status |
-| `/mcp tools` | List all available tool names |
-| `/mcp reconnect` | Reconnect all enabled servers |
-| `/mcp reconnect <server>` | Reconnect a specific server |
-
-### CLI
-
-```
---mcp-config <path>    Override config file path (default: ~/.pi/agent/mcp.json)
-```
-
-### Environment Variables
-
-```
-MCP_DIRECT_TOOLS       Comma-separated server/tool specifiers
-                       *                 = all servers
-                       server_name       = all tools from that server
-                       server/tool       = specific tool
-                       __none__          = no direct tools
-
-MCP_UI_DEBUG=1         Enable debug logging (for troubleshooting)
-```
+| 🔍 **ToolSearch** | Search & load MCP tools by keyword. ~2000+ tokens saved per turn. | [Examples →](docs/examples.md#example-1-toolsearch-discovery) |
+| ⚡ **Direct tools** | Frequently-used tools active from turn 1. Config + env var. | [Examples →](docs/examples.md#example-2-direct-tool-registration) |
+| 😴 **Lazy startup** | Servers connect on first tool call. No startup delay. | [Examples →](docs/examples.md#example-3-lazy-startup-by-default) |
+| 🔄 **Lifecycle modes** | `lazy`, `eager`, `keep-alive` per-server. | [Examples →](docs/examples.md#example-4-three-lifecycle-modes) |
+| ⏱️ **Idle timeout** | Auto-disconnect inactive servers. Configurable per-server. | [Examples →](docs/examples.md#example-5-idle-timeout) |
+| 📦 **Metadata cache** | Tool schemas cached to disk. Register tools without live connections. 7-day TTL. | [Examples →](docs/examples.md#example-6-metadata-cache) |
+| 🚀 **npx binary resolution** | Bypasses ~143MB npm parent process. Direct binary invocation. | [Examples →](docs/examples.md#example-7-npx-binary-resolution) |
+| 🗜️ **TOON encoding** | JSON→TOON compression. −27% tokens on JetBrains results. | [Examples →](docs/examples.md#example-8-toon-encoding) |
+| 📊 **Call statistics** | Per-server/per-tool counters. Find your most-used tools. | [Examples →](docs/examples.md#example-9-call-statistics) |
+| 📥 **Config imports** | Import MCP servers from Cursor, Claude, Codex, Windsurf, VS Code. | [Examples →](docs/examples.md#example-10-config-imports) |
+| 📁 **Project-local config** | `.pi/mcp.json` overrides user-global `~/.pi/agent/mcp.json`. | [Examples →](docs/examples.md#example-11-project-local-config) |
+| 📖 **Resource tools** | MCP resources exposed as callable Pi tools. | [Examples →](docs/examples.md#example-12-resource-tools) |
+| ⏳ **Failure backoff** | 60s cooldown after failed connections. | [Examples →](docs/examples.md#example-13-failure-backoff) |
+| 🔐 **Bearer auth** | Env var or static token. OAuth servers gracefully skipped. | [Examples →](docs/examples.md#example-14-bear-your-own-auth) |
+| 🛡️ **Collision guard** | Tools shadowing builtins silently skipped. | [Examples →](docs/examples.md#example-15-builtin-collision-guard) |
+| 🔀 **Cross-server dedup** | Handles name collisions in `prefix: "none"` / `"short"` modes. | [Examples →](docs/examples.md#example-16-cross-server-deduplication) |
+| 📡 **Status bar** | Connected/total server count in Pi footer. | [Examples →](docs/examples.md#example-17-status-bar) |
 
 ---
 
 ## Configuration Reference
 
-### File Locations
+### File locations
 
 | Priority | File | Scope |
 |---|---|---|
@@ -808,7 +114,7 @@ MCP_UI_DEBUG=1         Enable debug logging (for troubleshooting)
 | 2 | Imported configs | From other tools |
 | 3 (base) | `~/.pi/agent/mcp.json` | User global |
 
-### Per-Server Fields
+### Per-server fields
 
 | Field | Type | Default | Description |
 |---|---|---|---|
@@ -830,28 +136,30 @@ MCP_UI_DEBUG=1         Enable debug logging (for troubleshooting)
 | `excludeTools` | `string[]` | — | Hide specific tools from LLM |
 | `debug` | `boolean` | `false` | Show server stderr |
 
-### Global Settings
+### Global settings
 
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `toolPrefix` | `"server"` / `"short"` / `"none"` | `"server"` | Tool name prefix style |
 | `idleTimeout` | `number` | `10` | Global idle timeout in minutes |
-| `toonEncode` | `boolean` or `string[]` | — | Enable TOON encoding (true = all, array = specific servers) |
+| `toonEncode` | `boolean` or `string[]` | — | Enable TOON encoding (`true` = all, array = specific servers) |
 | `captureStats` | `boolean` or `object` | — | Enable call statistics |
 
-### Tool Name Prefixes
+### Commands
 
-```
-server name: "jetbrains-index"
-tool name:   "ide_find_definition"
+| Command | Description |
+|---|---|
+| `/mcp` or `/mcp status` | Show server connection status |
+| `/mcp tools` | List all available tool names |
+| `/mcp reconnect` | Reconnect all enabled servers |
+| `/mcp reconnect <server>` | Reconnect a specific server |
 
-mode "server" → jetbrains_index__ide_find_definition
-mode "short"  → jetbrains_index__ide_find_definition  (-mcp suffix stripped)
-mode "none"   → ide_find_definition
-```
+### Environment variables
 
-The `__` separator is unambiguous — server names with underscores are kept intact,
-only the tool name part is split on `_`.
+| Variable | Description |
+|---|---|
+| `MCP_DIRECT_TOOLS` | Comma-separated server/tool specifiers. `*` = all servers, `server_name` = all tools from that server, `server/tool` = specific tool, `__none__` = no direct tools |
+| `MCP_UI_DEBUG=1` | Enable debug logging |
 
 ---
 
@@ -887,22 +195,29 @@ only the tool name part is split on `_`.
           MCP Svr   MCP Svr     MCP Svr
 ```
 
-For the full technical architecture, see [docs/architecture.md](docs/architecture.md).
-
 ---
 
-## Changelog
+## Documentation
 
-See [CHANGELOG.md](CHANGELOG.md) for version history.
+| Document | Content |
+|---|---|
+| [examples.md](docs/examples.md) | All 17 examples with JSON configs and usage patterns |
+| [architecture.md](docs/architecture.md) | Full technical architecture — module map, lifecycle, data flow, transport layer |
+| [settings.md](docs/extensions/pi-mcp-adapter/settings.md) | Detailed settings reference |
+| [usage.md](docs/extensions/pi-mcp-adapter/usage.md) | Usage overview |
+| [maintenance.md](docs/extensions/pi-mcp-adapter/maintenance.md) | Module map, key events, tool registration flow |
+| [CHANGELOG.md](CHANGELOG.md) | Version history |
 
 ---
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT © 2026 Nico Bailon
 
----
+This project is a fork of [pi-mcp-adapter](https://github.com/nicobailon/pi-mcp-adapter) by Nico Bailon, modified and maintained as part of the [my-pi](https://github.com/ineersa/my-pi) monorepo. All original copyright and permission notices are preserved. See [LICENSE](LICENSE) for the full text.
 
-*This is a slimmed local fork of [pi-mcp-adapter](https://github.com/nicobailon/pi-mcp-adapter).
-Differences from upstream: no OAuth flows, no MCP UI panel integration, no interactive `/mcp`
-panel. If a server requires auth, it's reported as `needs-auth` and tool calls are skipped.*
+The following components are new in this fork:
+- **ToolSearch** — keyword-based tool discovery replacing the `mcp` proxy mega-tool
+- **TOON encoding** — JSON→TOON compression for token-efficient MCP responses
+- Tool activation via `pi.setActiveTools()` (requires pi-mono `refresh-tools-between-turns`)
+- Slimmed scope: no OAuth flows, no MCP UI panel, text-based `/mcp` commands only

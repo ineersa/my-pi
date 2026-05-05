@@ -12,7 +12,9 @@
       "docs": {
         "settings": "docs/extensions/pi-mcp-adapter/settings.md",
         "usage": "docs/extensions/pi-mcp-adapter/usage.md",
-        "maintenance": "docs/extensions/pi-mcp-adapter/maintenance.md"
+        "maintenance": "docs/extensions/pi-mcp-adapter/maintenance.md",
+        "examples": "docs/examples.md",
+        "architecture": "docs/architecture.md"
       }
     }
   ]
