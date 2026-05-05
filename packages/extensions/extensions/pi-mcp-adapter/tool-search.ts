@@ -5,19 +5,12 @@
 // - When it needs an MCP tool, it calls ToolSearch({ query: "..." })
 // - ToolSearch finds matches and activates them via setActiveTools
 //
-// The pi agent loop snapshots tools at start via createContextSnapshot(),
-// making setActiveTools mid-loop invisible to prepareToolCall(). To work
-// around this, ToolSearch supports direct execution: when args is provided,
-// it calls the MCP server inline and returns results immediately — no
-// two-turn limitation.
+// ToolSearch supports two modes: keyword search and exact "select:" prefix.
 
 import type { AgentToolResult, ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import type { McpExtensionState } from "./state.js";
-import { lazyConnect } from "./init.js";
-import { transformMcpContent } from "./tool-registrar.js";
-import { maybeEncodeToon } from "./toon-encoder.js";
-import type { McpContent } from "./types.js";
+
 
 // ---------------------------------------------------------------------------
 // Types
@@ -152,109 +145,7 @@ export function searchByKeywords(
   return scored.slice(0, MAX_RESULTS).map(s => s.tool);
 }
 
-// ---------------------------------------------------------------------------
-// Direct execution (bypasses pi's tool snapshot limitation)
-// ---------------------------------------------------------------------------
 
-/**
- * Execute a deferred MCP tool directly by connecting to its server and
- * calling the tool inline. This avoids the two-turn limitation where
- * setActiveTools is invisible to the running agent loop's context snapshot.
- */
-async function executeDeferredToolDirectly(
-  toolName: string,
-  args: Record<string, unknown>,
-  state: McpExtensionState,
-): Promise<AgentToolResult<Record<string, unknown>>> {
-  const deferredTools = getAllDeferredTools(state);
-  const tool = deferredTools.find(
-    t => t.name === toolName || t.originalName === toolName,
-  );
-
-  if (!tool) {
-    return {
-      content: [{
-        type: "text" as const,
-        text: `Tool "${toolName}" not found among deferred tools. Use ToolSearch without args to discover available tools.`,
-      }],
-      details: { error: "tool_not_found", toolName },
-    };
-  }
-
-  // Lazy-connect to the server if not already connected
-  const connected = await lazyConnect(state, tool.serverName);
-  if (!connected) {
-    const conn = state.manager.getConnection(tool.serverName);
-    if (conn?.status === "needs-auth") {
-      return {
-        content: [{
-          type: "text" as const,
-          text: `MCP server "${tool.serverName}" requires authentication (not supported in this build).`,
-        }],
-        details: { error: "auth_required", server: tool.serverName },
-      };
-    }
-    return {
-      content: [{
-        type: "text" as const,
-        text: `MCP server "${tool.serverName}" is not available. It may be offline or unreachable.`,
-      }],
-      details: { error: "server_unavailable", server: tool.serverName },
-    };
-  }
-
-  const connection = state.manager.getConnection(tool.serverName);
-  if (!connection || connection.status !== "connected") {
-    return {
-      content: [{
-        type: "text" as const,
-        text: `MCP server "${tool.serverName}" not connected.`,
-      }],
-      details: { error: "not_connected", server: tool.serverName },
-    };
-  }
-
-  try {
-    state.manager.touch(tool.serverName);
-    state.manager.incrementInFlight(tool.serverName);
-
-    const result = await connection.client.callTool({
-      name: tool.originalName,
-      arguments: args,
-    });
-
-    const mcpContent = (result.content ?? []) as McpContent[];
-    const rawContent = transformMcpContent(mcpContent);
-
-    if (result.isError) {
-      const errorText = rawContent
-        .filter(c => c.type === "text")
-        .map(c => (c as { text: string }).text)
-        .join("\n") || "Tool execution failed";
-      return {
-        content: [{ type: "text" as const, text: `Error: ${errorText}` }],
-        details: { error: "tool_error", server: tool.serverName },
-      };
-    }
-
-    const content = maybeEncodeToon(rawContent, tool.serverName, state.config);
-    return {
-      content: content.length > 0
-        ? content
-        : [{ type: "text" as const, text: "(empty result)" }],
-      details: { server: tool.serverName, tool: tool.originalName },
-    };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return {
-      content: [{ type: "text" as const, text: `Failed to call tool: ${message}` }],
-      details: { error: "call_failed", server: tool.serverName },
-    };
-  } finally {
-    state.manager.decrementInFlight(tool.serverName);
-    state.manager.touch(tool.serverName);
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Activation
@@ -356,9 +247,9 @@ export function buildToolSearchDescription(state: McpExtensionState | null): str
     return "MCP not initialized. Tools will be available after session start.";
   }
   const deferred = getAllDeferredTools(state);
-  let desc = `Discover and load MCP tools on demand.
+  let desc = `YOU MUST use ToolSearch FIRST to discover and load ANY of the MCP tools listed below. Do NOT attempt to call any of these tools by name before using ToolSearch — they are not active and will not be found.
 
-You search for tools by name or description. Matching tools are activated with their full parameter schemas, then you can call them directly.
+To load a tool: search by keywords, or use "select:server__toolname" to load a specific tool by its full prefixed name.
 
 ## Available MCP tools:
 
@@ -376,11 +267,9 @@ You search for tools by name or description. Matching tools are activated with t
     desc += "(No deferred MCP tools available — all tools are direct or none are configured)\n";
   } else {
     for (const [serverName, tools] of byServer) {
-      const status = getServerStatusSummary(state, serverName);
-      desc += `### ${serverName}${status ? ` (${status})` : ""}\n`;
+      desc += `### ${serverName}\n`;
       for (const tool of tools) {
-        const shortDesc = (tool.description || "").split("\n")[0].slice(0, 100);
-        desc += `- ${tool.name}: ${shortDesc}\n`;
+        desc += `- ${tool.name}\n`;
       }
       desc += "\n";
     }
@@ -388,26 +277,12 @@ You search for tools by name or description. Matching tools are activated with t
 
   desc += `## Usage:
 - ToolSearch({ query: "keywords" }) — search by keywords, loads matches
-- ToolSearch({ query: "select:server_toolname" }) — load specific tools by name
-- ToolSearch({ query: "toolname", args: { param: value } }) — execute a tool directly inline, returns result immediately
-
-When executing directly with args, ToolSearch calls the MCP server and returns the result in one step.`;
+- ToolSearch({ query: "select:server__toolname" }) — load specific tools by full prefixed name`;
 
   return desc;
 }
 
-/**
- * Get a short status label for a server (e.g. "connected", "not connected", "cached").
- */
-function getServerStatusSummary(state: McpExtensionState, serverName: string): string {
-  const connection = state.manager.getConnection(serverName);
-  if (connection?.status === "connected") return "connected";
-  if (connection?.status === "needs-auth") return "needs auth";
-  // If metadata exists (from cache), it's available without connection
-  const metadata = state.toolMetadata.get(serverName);
-  if (metadata && metadata.length > 0) return "cached";
-  return "not connected";
-}
+
 
 // ---------------------------------------------------------------------------
 // ToolSearch tool definition
@@ -431,15 +306,14 @@ export function createToolSearchTool(
     parameters: Type.Object({
       query: Type.String({
         description:
-          'Search query. Use "select:name1,name2" to load exact tools by name, '
-          + "or use keywords like \"jetbrains find definition\" to search by name/description. "
-          + "To execute a tool directly, provide the full tool name here and pass its parameters via args.",
+          'Search query. Use "select:server__toolname" to load exact tools by name '
+          + "(e.g. \"select:jetbrains_index__ide_find_definition\"), "
+          + "or use keywords like \"jetbrains find definition\" to search by name/description.",
       }),
-      args: Type.Optional(Type.Unsafe<Record<string, unknown>>({})),
     }),
     async execute(
       _toolCallId: string,
-      params: { query: string; args?: Record<string, unknown> },
+      params: { query: string },
     ): Promise<AgentToolResult<Record<string, unknown>>> {
       const currentState = getState();
       if (!currentState) {
@@ -453,16 +327,6 @@ export function createToolSearchTool(
       }
 
       const { query } = params;
-      const execArgs = params.args;
-
-      // Direct execution: when args are provided (even empty for zero-arg tools),
-      // treat query as the tool name and execute the MCP tool inline.
-      // This bypasses pi's agent-loop context snapshot limitation where
-      // setActiveTools is invisible to the running loop's prepareToolCall().
-      if (execArgs !== undefined) {
-        return executeDeferredToolDirectly(query, execArgs, currentState);
-      }
-
       const deferredTools = getAllDeferredTools(currentState);
 
       // Parse "select:" prefix for exact tool loading
