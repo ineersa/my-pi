@@ -41,7 +41,6 @@ Package responsibilities:
   - `usage`: provider usage/rate-limit probe with timeout + graceful degradation.
   - `pi-mcp-adapter`: MCP lifecycle/proxy/direct-tools bridge from `mcp.json`.
   - `subagents`: delegated to [pi-subagents](https://github.com/nicobailon/pi-subagents) (installed separately, builtins disabled).
-  - `intercom`: broker-backed local session messaging + queued reconnect handling.
   - `custom-compaction`: policy-based compaction profiles and summary templates.
   - `output-cap`: captures large tool outputs to files and avoids response bloat.
 - `packages/scheduler` (standalone): `schedule_prompt`, natural-language schedules,
@@ -64,7 +63,6 @@ Package responsibilities:
 | session-status | [settings](packages/extensions/docs/extensions/session-status/settings.md) · [maintenance](packages/extensions/docs/extensions/session-status/maintenance.md) |
 | usage | [settings](packages/extensions/docs/extensions/usage/settings.md) · [maintenance](packages/extensions/docs/extensions/usage/maintenance.md) |
 | pi-mcp-adapter | [settings](packages/extensions/docs/extensions/pi-mcp-adapter/settings.md) · [maintenance](packages/extensions/docs/extensions/pi-mcp-adapter/maintenance.md) |
-| intercom | [settings](packages/extensions/docs/extensions/intercom/settings.md) · [maintenance](packages/extensions/docs/extensions/intercom/maintenance.md) |
 | custom-compaction | [settings](packages/extensions/docs/extensions/custom-compaction/settings.md) · [maintenance](packages/extensions/docs/extensions/custom-compaction/maintenance.md) |
 | output-cap | [settings](packages/extensions/docs/extensions/output-cap/settings.md) · [maintenance](packages/extensions/docs/extensions/output-cap/maintenance.md) |
 | verbosity-control | [settings](packages/extensions/docs/extensions/verbosity-control/settings.md) · [maintenance](packages/extensions/docs/extensions/verbosity-control/maintenance.md) |

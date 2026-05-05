@@ -7,7 +7,6 @@ npm-debug.log*
 # tracked global pi bootstrap (never commit auth or runtime)
 pi-settings/**/auth.json
 pi-settings/**/sessions/
-pi-settings/**/intercom/
 pi-settings/**/scheduler/
 
 # misc

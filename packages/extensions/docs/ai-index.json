@@ -115,17 +115,6 @@
       }
     },
     {
-      "id": "intercom",
-      "kind": "extension",
-      "name": "intercom",
-      "entry": "./extensions/intercom/intercom.ts",
-      "docs": {
-        "settings": "docs/extensions/intercom/settings.md",
-        "usage": "docs/extensions/intercom/usage.md",
-        "maintenance": "docs/extensions/intercom/maintenance.md"
-      }
-    },
-    {
       "id": "custom-compaction",
       "kind": "extension",
       "name": "custom-compaction",
