@@ -1,8 +1,8 @@
 {
   "spec": "my-pi.ai-docs/v1",
   "package": "@ineersa/my-pi-extensions",
-  "version": "0.1.3",
-  "updatedAt": "2026-04-23",
+  "version": "0.1.8",
+  "updatedAt": "2026-05-05",
   "entities": [
     {
       "id": "safe-guard",
@@ -101,17 +101,6 @@
         "settings": "docs/extensions/usage/settings.md",
         "usage": "docs/extensions/usage/usage.md",
         "maintenance": "docs/extensions/usage/maintenance.md"
-      }
-    },
-    {
-      "id": "pi-mcp-adapter",
-      "kind": "extension",
-      "name": "pi-mcp-adapter",
-      "entry": "./extensions/pi-mcp-adapter/pi-mcp-adapter.ts",
-      "docs": {
-        "settings": "docs/extensions/pi-mcp-adapter/settings.md",
-        "usage": "docs/extensions/pi-mcp-adapter/usage.md",
-        "maintenance": "docs/extensions/pi-mcp-adapter/maintenance.md"
       }
     },
     {

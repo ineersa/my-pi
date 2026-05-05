@@ -14,9 +14,10 @@ Running `npx @ineersa/my-pi` registers the following packages globally in `~/.pi
 
 | Package | What it adds |
 |---------|-------------|
-| `@ineersa/my-pi-extensions` | safe-guard, bg-process, compact-header, custom-footer, skill-palette, rewind, session-status, usage, pi-mcp-adapter, subagents-lite |
+| `@ineersa/my-pi-extensions` | safe-guard, bg-process, compact-header, custom-footer, skill-palette, rewind, session-status, usage, subagents-lite |
 | `@ineersa/my-pi-scheduler` | Recurring checks, one-time reminders, `schedule_prompt` tool (optional; prompted separately with default **No**) |
 | `@ineersa/my-pi-jetbrains-index` | Standalone JetBrains index diagnostics gate (IDE-first guardrails + diagnostics sync) |
+| `@ineersa/my-pi-mcp-adapter` | Standalone MCP adapter: ToolSearch discovery, direct tools, lazy/eager/keep-alive lifecycle, metadata caching |
 | `@ineersa/my-pi-themes` | Theme pack: catppuccin-mocha, cyberpunk, gruvbox-dark, nord, oh-p-dark, tokyo-night |
 
 It also:
@@ -71,6 +72,7 @@ packages/
   extensions/      # extension bundle (safe-guard, bg-process, rewind, session-status, ...)
   scheduler/       # standalone scheduler extension
   jetbrains-index/ # standalone jetbrains-index extension
+  pi-mcp-adapter/  # standalone MCP adapter extension
   themes/          # curated pi themes
   my-pi/           # installer CLI
 ```
@@ -218,8 +220,9 @@ npm run publish:all
 
 | Package | Description |
 |---------|-------------|
-| `@ineersa/my-pi-extensions` | Extension bundle: safe-guard, bg-process, compact-header, custom-footer, skill-palette, session-status, rewind, usage, pi-mcp-adapter, subagents-lite |
+| `@ineersa/my-pi-extensions` | Extension bundle: safe-guard, bg-process, compact-header, custom-footer, skill-palette, session-status, rewind, usage, subagents-lite |
 | `@ineersa/my-pi-scheduler` | Standalone scheduler: recurring checks, one-time reminders, `schedule_prompt` tool |
 | `@ineersa/my-pi-jetbrains-index` | Standalone JetBrains index diagnostics gate (IDE-first guardrails + diagnostics sync) |
+| `@ineersa/my-pi-mcp-adapter` | Standalone MCP adapter: ToolSearch discovery, direct tools, lazy/eager/keep-alive lifecycle, metadata caching |
 | `@ineersa/my-pi-themes` | Curated theme pack: catppuccin-mocha, cyberpunk, gruvbox-dark, nord, oh-p-dark, tokyo-night |
 | `@ineersa/my-pi` | One-command installer for all packages |

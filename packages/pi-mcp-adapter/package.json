@@ -1,0 +1,71 @@
+{
+  "name": "@ineersa/my-pi-mcp-adapter",
+  "version": "0.1.8",
+  "description": "MCP (Model Context Protocol) adapter extension for Pi coding agent — bridges any MCP server into Pi as first-class tools",
+  "type": "module",
+  "keywords": [
+    "pi-package",
+    "pi-coding-agent",
+    "mcp",
+    "model-context-protocol"
+  ],
+  "license": "MIT",
+  "author": "Nico Bailon",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ineersa/my-pi.git",
+    "directory": "packages/pi-mcp-adapter"
+  },
+  "homepage": "https://github.com/ineersa/my-pi/tree/main/packages/pi-mcp-adapter#readme",
+  "bugs": {
+    "url": "https://github.com/ineersa/my-pi/issues"
+  },
+  "bin": {
+    "pi-mcp-adapter": "cli.js"
+  },
+  "pi": {
+    "extensions": [
+      "./pi-mcp-adapter.ts"
+    ]
+  },
+  "files": [
+    "cli.js",
+    "pi-mcp-adapter.ts",
+    "state.ts",
+    "utils.ts",
+    "tool-metadata.ts",
+    "init.ts",
+    "direct-tools.ts",
+    "commands.ts",
+    "types.ts",
+    "config.ts",
+    "server-manager.ts",
+    "tool-registrar.ts",
+    "resource-tools.ts",
+    "lifecycle.ts",
+    "metadata-cache.ts",
+    "npx-resolver.ts",
+    "logger.ts",
+    "errors.ts",
+    "tool-search.ts",
+    "toon-encoder.ts",
+    "stats.ts",
+    "mcp-shared-state.ts",
+    "docs",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "!**/*.test.ts"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.1",
+    "@sinclair/typebox": "^0.32.0",
+    "@toon-format/toon": "^2.1.0"
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-agent-core": "*",
+    "@mariozechner/pi-ai": "*",
+    "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-tui": "*"
+  }
+}

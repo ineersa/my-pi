@@ -22,8 +22,8 @@
     "install:subagents": "node scripts/install-subagents.mjs",
     "remove:subagents": "node scripts/install-subagents.mjs --remove",
     "typecheck": "tsc --noEmit",
-    "version:all:patch": "npm version patch -w @ineersa/my-pi-extensions -w @ineersa/my-pi-scheduler -w @ineersa/my-pi-jetbrains-index -w @ineersa/my-pi-themes -w @ineersa/my-pi",
-    "publish:all": "npm publish --workspace=@ineersa/my-pi-extensions --access public && npm publish --workspace=@ineersa/my-pi-scheduler --access public && npm publish --workspace=@ineersa/my-pi-jetbrains-index --access public && npm publish --workspace=@ineersa/my-pi-themes --access public && npm publish --workspace=@ineersa/my-pi --access public"
+    "version:all:patch": "npm version patch -w @ineersa/my-pi-extensions -w @ineersa/my-pi-scheduler -w @ineersa/my-pi-jetbrains-index -w @ineersa/my-pi-themes -w @ineersa/my-pi-mcp-adapter -w @ineersa/my-pi",
+    "publish:all": "npm publish --workspace=@ineersa/my-pi-extensions --access public && npm publish --workspace=@ineersa/my-pi-scheduler --access public && npm publish --workspace=@ineersa/my-pi-jetbrains-index --access public && npm publish --workspace=@ineersa/my-pi-themes --access public && npm publish --workspace=@ineersa/my-pi-mcp-adapter --access public && npm publish --workspace=@ineersa/my-pi --access public"
   },
   "devDependencies": {
     "@types/node": "^24.5.2",

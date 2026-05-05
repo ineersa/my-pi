@@ -9,7 +9,7 @@ import { loadMetadataCache } from "./metadata-cache.js";
 import { getConfigPathFromArgv, truncateAtWord } from "./utils.js";
 import { createToolSearchTool } from "./tool-search.js";
 
-import { setMcpState } from "../mcp-shared-state.js";
+import { setMcpState } from "./mcp-shared-state.js";
 
 export default function mcpAdapter(pi: ExtensionAPI) {
   let state: McpExtensionState | null = null;

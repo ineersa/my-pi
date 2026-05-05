@@ -1,0 +1,19 @@
+{
+  "spec": "my-pi.ai-docs/v1",
+  "package": "@ineersa/my-pi-mcp-adapter",
+  "version": "0.1.8",
+  "updatedAt": "2026-05-05",
+  "entities": [
+    {
+      "id": "pi-mcp-adapter",
+      "kind": "extension",
+      "name": "pi-mcp-adapter",
+      "entry": "./pi-mcp-adapter.ts",
+      "docs": {
+        "settings": "docs/extensions/pi-mcp-adapter/settings.md",
+        "usage": "docs/extensions/pi-mcp-adapter/usage.md",
+        "maintenance": "docs/extensions/pi-mcp-adapter/maintenance.md"
+      }
+    }
+  ]
+}

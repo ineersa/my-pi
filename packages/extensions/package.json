@@ -17,7 +17,6 @@
       "./extensions/rewind/rewind.ts",
       "./extensions/session-status.ts",
       "./extensions/usage.ts",
-      "./extensions/pi-mcp-adapter/pi-mcp-adapter.ts",
       "./extensions/custom-compaction/custom-compaction.ts",
       "./extensions/output-cap/output-cap.ts",
       "./extensions/ide/ide.ts",
@@ -30,8 +29,6 @@
     "README.md"
   ],
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.25.1",
-    "@toon-format/toon": "^2.1.0",
     "tsx": "^4.20.0"
   },
   "peerDependencies": {

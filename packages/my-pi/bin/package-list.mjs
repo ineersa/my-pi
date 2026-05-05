@@ -19,4 +19,9 @@ export const INSTALLER_PACKAGES = [
     npmName: "@ineersa/my-pi-themes",
     localPath: "packages/themes",
   },
+  {
+    name: "my-pi-mcp-adapter",
+    npmName: "@ineersa/my-pi-mcp-adapter",
+    localPath: "packages/pi-mcp-adapter",
+  },
 ];

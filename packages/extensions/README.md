@@ -26,6 +26,7 @@ Local dev: `pi install ./packages/extensions -l`
 
 - **[@ineersa/my-pi-scheduler](../scheduler/README.md)** — recurring checks, one-time reminders, and the LLM-callable `schedule_prompt` tool. Installs separately for projects that need scheduled follow-ups.
 - **[@ineersa/my-pi-jetbrains-index](../jetbrains-index/README.md)** — standalone JetBrains index diagnostics gate extension with IDE-first guardrails and diagnostics sync.
+- **[@ineersa/my-pi-mcp-adapter](../pi-mcp-adapter/README.md)** — standalone MCP adapter: ToolSearch discovery, direct tools, lazy/eager/keep-alive lifecycle, metadata caching.
 - **[@ineersa/my-pi-themes](../themes/README.md)** — curated theme pack (catppuccin-mocha, cyberpunk, gruvbox-dark, nord, oh-p-dark, tokyo-night).
 
 ## Add a new extension

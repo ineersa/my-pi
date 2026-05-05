@@ -12,7 +12,6 @@ const EXTENSIONS_ENTITY_NAMES = [
 	"rewind",
 	"session-status",
 	"usage",
-	"pi-mcp-adapter",
 	"subagents",
 	"custom-compaction",
 	"output-cap",

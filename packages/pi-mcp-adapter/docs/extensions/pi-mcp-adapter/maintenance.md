@@ -1,6 +1,6 @@
 # pi-mcp-adapter maintenance
 
-Entry: `extensions/pi-mcp-adapter/pi-mcp-adapter.ts`
+Entry: `pi-mcp-adapter.ts`
 
 ## Module Map
 

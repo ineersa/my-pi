@@ -39,7 +39,6 @@ Package responsibilities:
   - `rewind`: git-based checkpoint snapshots + deterministic restore flows.
   - `session-status`: minimal session lifecycle status utility.
   - `usage`: provider usage/rate-limit probe with timeout + graceful degradation.
-  - `pi-mcp-adapter`: MCP lifecycle/proxy/direct-tools bridge from `mcp.json`.
   - `subagents`: delegated to [pi-subagents](https://github.com/nicobailon/pi-subagents) (installed separately, builtins disabled).
   - `custom-compaction`: policy-based compaction profiles and summary templates.
   - `output-cap`: captures large tool outputs to files and avoids response bloat.
@@ -47,6 +46,7 @@ Package responsibilities:
   persisted tasks, idle dispatch, and multi-instance ownership/lease coordination.
 - `packages/jetbrains-index` (standalone): IDE-first guidance, dumb-mode edit/write
   blocking, changed-path sync, and post-mutation diagnostics.
+- `packages/pi-mcp-adapter` (standalone): MCP lifecycle/proxy/direct-tools bridge from `mcp.json`.
 - `packages/themes`: curated presentation-only themes, independent from extension runtime.
 
 ### Extension docs map
@@ -62,7 +62,7 @@ Package responsibilities:
 | rewind | [settings](packages/extensions/docs/extensions/rewind/settings.md) · [maintenance](packages/extensions/docs/extensions/rewind/maintenance.md) |
 | session-status | [settings](packages/extensions/docs/extensions/session-status/settings.md) · [maintenance](packages/extensions/docs/extensions/session-status/maintenance.md) |
 | usage | [settings](packages/extensions/docs/extensions/usage/settings.md) · [maintenance](packages/extensions/docs/extensions/usage/maintenance.md) |
-| pi-mcp-adapter | [settings](packages/extensions/docs/extensions/pi-mcp-adapter/settings.md) · [maintenance](packages/extensions/docs/extensions/pi-mcp-adapter/maintenance.md) |
+| pi-mcp-adapter | [settings](packages/pi-mcp-adapter/docs/extensions/pi-mcp-adapter/settings.md) · [maintenance](packages/pi-mcp-adapter/docs/extensions/pi-mcp-adapter/maintenance.md) |
 | custom-compaction | [settings](packages/extensions/docs/extensions/custom-compaction/settings.md) · [maintenance](packages/extensions/docs/extensions/custom-compaction/maintenance.md) |
 | output-cap | [settings](packages/extensions/docs/extensions/output-cap/settings.md) · [maintenance](packages/extensions/docs/extensions/output-cap/maintenance.md) |
 | verbosity-control | [settings](packages/extensions/docs/extensions/verbosity-control/settings.md) · [maintenance](packages/extensions/docs/extensions/verbosity-control/maintenance.md) |
