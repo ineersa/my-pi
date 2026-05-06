@@ -1,17 +1,17 @@
 import type { Api, Model } from "@mariozechner/pi-ai";
 import { compact, type ExtensionAPI, type ExtensionContext, type SessionBeforeCompactEvent } from "@mariozechner/pi-coding-agent";
-import type { SummaryPolicy } from "../policy/types.js";
+import type { SummaryPolicy } from "../policy/types";
 import {
 	computeFileLists,
 	formatFileOperations,
 	generateTemplateSummary,
 	generateTurnPrefixSummary,
-} from "../summary/generate.js";
-import { buildSummaryPrompt, discoverTemplate, resolveSummarySettings } from "../summary/template.js";
-import { getLastAssistantMessage, resolveSummaryModel } from "../runtime/model-resolution.js";
-import { resolveEffectivePolicy, shouldTriggerProactiveCompact } from "../runtime/pure.js";
-import { rebuildPreparationWithKeepRecentTokens, resolveSummaryRetention } from "../runtime/retention.js";
-import type { RuntimeServices } from "../runtime/session-state.js";
+} from "../summary/generate";
+import { buildSummaryPrompt, discoverTemplate, resolveSummarySettings } from "../summary/template";
+import { getLastAssistantMessage, resolveSummaryModel } from "../runtime/model-resolution";
+import { resolveEffectivePolicy, shouldTriggerProactiveCompact } from "../runtime/pure";
+import { rebuildPreparationWithKeepRecentTokens, resolveSummaryRetention } from "../runtime/retention";
+import type { RuntimeServices } from "../runtime/session-state";
 
 async function generateCustomCompaction(
 	preparation: SessionBeforeCompactEvent["preparation"],

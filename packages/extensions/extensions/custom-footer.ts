@@ -15,7 +15,6 @@
 import type { AssistantMessage } from "@mariozechner/pi-ai";
 import type { ExtensionAPI, ExtensionContext, ReadonlyFooterDataProvider } from "@mariozechner/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
-import { getSafeModeState, subscribeSafeMode } from "./runtime-mode";
 
 /** OSC 8 hyperlink: renders `text` as a clickable terminal link to `url`. */
 export function hyperlink(url: string, text: string): string {
@@ -167,23 +166,18 @@ export default function (pi: ExtensionAPI) {
 				probePr(footerData.getGitBranch());
 				tui.requestRender();
 			});
-			const unsubSafeMode = subscribeSafeMode(() => tui.requestRender());
-			const timer = setInterval(() => tui.requestRender(), 30000);
+				const timer = setInterval(() => tui.requestRender(), 30000);
 			probePr(footerData.getGitBranch());
 
 			return {
 				dispose() {
 					unsub();
-					unsubSafeMode();
 					clearInterval(timer);
 				},
 				// biome-ignore lint/suspicious/noEmptyBlockStatements: Required by footer interface
 				invalidate() {},
 				// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Footer rendering combines multiple live metrics in one pass.
 				render(width: number): string[] {
-					if (getSafeModeState().enabled) {
-						return [];
-					}
 					const usage = ctx.getContextUsage();
 					const pct = usage?.percent ?? 0;
 
@@ -386,17 +380,6 @@ export default function (pi: ExtensionAPI) {
 			for (const [key, value] of statuses) {
 				lines.push(`  ${theme.fg("dim", key.padEnd(24))}${value}`);
 			}
-			lines.push("");
-		}
-
-		// ── Safe mode ──
-		const safeMode = getSafeModeState();
-		if (safeMode.enabled) {
-			lines.push(`  ${divider}`);
-			const source = safeMode.auto ? "auto" : (safeMode.source ?? "manual");
-			lines.push(
-				`  ${theme.fg("warning", "⚠ Safe mode ON")}${sep}source: ${source}${safeMode.reason ? `${sep}${safeMode.reason}` : ""}`,
-			);
 			lines.push("");
 		}
 

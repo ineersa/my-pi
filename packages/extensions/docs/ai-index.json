@@ -104,17 +104,6 @@
       }
     },
     {
-      "id": "custom-compaction",
-      "kind": "extension",
-      "name": "custom-compaction",
-      "entry": "./extensions/custom-compaction/custom-compaction.ts",
-      "docs": {
-        "settings": "docs/extensions/custom-compaction/settings.md",
-        "usage": "docs/extensions/custom-compaction/usage.md",
-        "maintenance": "docs/extensions/custom-compaction/maintenance.md"
-      }
-    },
-    {
       "id": "output-cap",
       "kind": "extension",
       "name": "output-cap",

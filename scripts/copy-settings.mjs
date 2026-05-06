@@ -9,7 +9,6 @@ const globalPiDir = resolve(homedir(), ".pi");
 const localPiDir = resolve(process.cwd(), ".pi");
 
 const AGENT_FILES = [
-	"compaction-policy.json",
 	"mcp.json",
 	"models.json",
 	"safe-guard.json",

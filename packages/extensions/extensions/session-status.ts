@@ -13,7 +13,6 @@ const EXTENSIONS_ENTITY_NAMES = [
 	"session-status",
 	"usage",
 	"subagents",
-	"custom-compaction",
 	"output-cap",
 	"ide",
 ];

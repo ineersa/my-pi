@@ -4,7 +4,7 @@ import type {
 	PolicyKey,
 	ProfileOverride,
 	SummaryThinkingLevel,
-} from "./types.js";
+} from "./types";
 
 export function setPatchValue(patch: CompactionPolicyPatch, key: PolicyKey, value: unknown): void {
 	switch (key) {

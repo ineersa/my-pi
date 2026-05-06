@@ -13,7 +13,6 @@ import { join } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { getAgentDir } from "@mariozechner/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
-import { getSafeModeState, subscribeSafeMode } from "./runtime-mode";
 import { getMcpServerStatus } from "./mcp-shared-state.js";
 import { discoverAvailableAgentNames } from "./lib/agent-discovery.js";
 
@@ -113,15 +112,8 @@ export default function (pi: ExtensionAPI) {
 	// Widget factory — reads MCP status live on every render
 	function createWidget(ctx: ExtensionContext): (tui: any, theme: any) => any {
 		return (tui, theme) => {
-			const unsubSafeMode = subscribeSafeMode(() => tui.requestRender());
 			return {
-				dispose() {
-					unsubSafeMode();
-				},
 				render(width: number): string[] {
-					if (getSafeModeState().enabled) {
-						return [];
-					}
 					const d = (s: string) => theme.fg("dim", s);
 					const a = (s: string) => theme.fg("accent", s);
 

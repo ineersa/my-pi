@@ -1,12 +1,12 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { parsePolicyPatch } from "./parse.js";
+import { parsePolicyPatch } from "./parse";
 import {
 	CONFIG_FILE,
 	type CompactionPolicyPatch,
 	type ParseResult,
-} from "./types.js";
+} from "./types";
 
 const GLOBAL_CONFIG_PATH = join(homedir(), ".pi", "agent", "compaction-policy.json");
 

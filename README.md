@@ -17,6 +17,7 @@ Running `npx @ineersa/my-pi` registers the following packages globally in `~/.pi
 | `@ineersa/my-pi-extensions` | safe-guard, bg-process, compact-header, custom-footer, skill-palette, rewind, session-status, usage, subagents-lite |
 | `@ineersa/my-pi-scheduler` | Recurring checks, one-time reminders, `schedule_prompt` tool (optional; prompted separately with default **No**) |
 | `@ineersa/my-pi-jetbrains-index` | Standalone JetBrains index diagnostics gate (IDE-first guardrails + diagnostics sync) |
+| `github:ineersa/pi-observational-memory` | Observational memory extension installed directly from your fork |
 | `@ineersa/my-pi-mcp-adapter` | Standalone MCP adapter: ToolSearch discovery, direct tools, lazy/eager/keep-alive lifecycle, metadata caching |
 | `@ineersa/my-pi-themes` | Theme pack: catppuccin-mocha, cyberpunk, gruvbox-dark, nord, oh-p-dark, tokyo-night |
 
@@ -223,6 +224,7 @@ npm run publish:all
 | `@ineersa/my-pi-extensions` | Extension bundle: safe-guard, bg-process, compact-header, custom-footer, skill-palette, session-status, rewind, usage, subagents-lite |
 | `@ineersa/my-pi-scheduler` | Standalone scheduler: recurring checks, one-time reminders, `schedule_prompt` tool |
 | `@ineersa/my-pi-jetbrains-index` | Standalone JetBrains index diagnostics gate (IDE-first guardrails + diagnostics sync) |
+| `github:ineersa/pi-observational-memory` | Observational memory extension installed directly from your fork |
 | `@ineersa/my-pi-mcp-adapter` | Standalone MCP adapter: ToolSearch discovery, direct tools, lazy/eager/keep-alive lifecycle, metadata caching |
 | `@ineersa/my-pi-themes` | Curated theme pack: catppuccin-mocha, cyberpunk, gruvbox-dark, nord, oh-p-dark, tokyo-night |
 | `@ineersa/my-pi` | One-command installer for all packages |

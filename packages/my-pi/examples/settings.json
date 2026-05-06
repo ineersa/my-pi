@@ -32,5 +32,20 @@
     "google-gemini-cli/gemini-3-flash-preview",
     "google-gemini-cli/gemini-3-pro-preview",
     "google-gemini-cli/gemini-3.1-pro-preview"
-  ]
+  ],
+  "observational-memory": {
+    "observationThresholdTokens": 2000,
+    "compactionThresholdTokens": 50000,
+    "reflectionThresholdTokens": 30000,
+    "passive": false,
+    "compactionModel": {
+      "provider": "llama.cpp",
+      "id": "flash"
+    }
+  },
+  "compaction": {
+    "enabled": true,
+    "keepRecentTokens": 20000,
+    "reserveTokens": 16384
+  }
 }

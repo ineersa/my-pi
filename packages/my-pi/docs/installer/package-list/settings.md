@@ -13,4 +13,5 @@
 - `@ineersa/my-pi-extensions` → `packages/extensions`
 - `@ineersa/my-pi-scheduler` → `packages/scheduler`
 - `@ineersa/my-pi-jetbrains-index` → `packages/jetbrains-index`
+- `github:ineersa/pi-observational-memory` → `../pi-observational-memory`
 - `@ineersa/my-pi-themes` → `packages/themes`

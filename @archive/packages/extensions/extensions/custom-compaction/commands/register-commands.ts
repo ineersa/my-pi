@@ -1,8 +1,8 @@
 import type { ExtensionAPI, ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
-import { resolveEffectivePolicy } from "../runtime/pure.js";
-import { formatSummaryRetention } from "../runtime/retention.js";
-import type { RuntimeServices } from "../runtime/session-state.js";
-import { discoverTemplate } from "../summary/template.js";
+import { resolveEffectivePolicy } from "../runtime/pure";
+import { formatSummaryRetention } from "../runtime/retention";
+import type { RuntimeServices } from "../runtime/session-state";
+import { discoverTemplate } from "../summary/template";
 
 function formatModels(policy: { models: Array<{ model: string; thinkingLevel?: string }> }): string {
 	return policy.models

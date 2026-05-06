@@ -1,10 +1,10 @@
 import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { Loader } from "@mariozechner/pi-tui";
-import { mergePolicy } from "../policy/merge.js";
-import { readProjectPolicyPatch } from "../policy/config.js";
-import { DEFAULT_POLICY, type CompactionPolicy } from "../policy/types.js";
-import { computeEffectiveMaxTokens } from "./pure.js";
-import { formatSummaryRetention } from "./retention.js";
+import { mergePolicy } from "../policy/merge";
+import { readProjectPolicyPatch } from "../policy/config";
+import { DEFAULT_POLICY, type CompactionPolicy } from "../policy/types";
+import { computeEffectiveMaxTokens } from "./pure";
+import { formatSummaryRetention } from "./retention";
 
 const STATUS_KEY = "compact-policy";
 const WATCHDOG_MS = 120_000;

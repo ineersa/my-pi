@@ -6,7 +6,7 @@ import {
 	type SessionBeforeCompactEvent,
 	type SessionEntry,
 } from "@mariozechner/pi-coding-agent";
-import type { SummaryRetentionPolicy } from "../policy/types.js";
+import type { SummaryRetentionPolicy } from "../policy/types";
 
 export interface SummaryRetentionResolution {
 	keepRecentTokens: number;

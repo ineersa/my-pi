@@ -15,6 +15,11 @@ export const INSTALLER_PACKAGES = [
     localPath: "packages/jetbrains-index",
   },
   {
+    name: "pi-observational-memory",
+    npmName: "github:ineersa/pi-observational-memory",
+    localPath: "../pi-observational-memory",
+  },
+  {
     name: "my-pi-themes",
     npmName: "@ineersa/my-pi-themes",
     localPath: "packages/themes",

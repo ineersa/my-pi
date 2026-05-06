@@ -1,4 +1,4 @@
-import { setPatchValue } from "./merge.js";
+import { setPatchValue } from "./merge";
 import {
 	type AutoMaxTokensConfig,
 	type CompactionPolicyPatch,
@@ -10,7 +10,7 @@ import {
 	type SummaryModelOverride,
 	type SummaryRetentionPolicy,
 	type SummaryThinkingLevel,
-} from "./types.js";
+} from "./types";
 
 const POLICY_SECTIONS = new Set(["trigger", "ui", "summary"]);
 

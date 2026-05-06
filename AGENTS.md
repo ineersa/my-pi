@@ -40,7 +40,6 @@ Package responsibilities:
   - `session-status`: minimal session lifecycle status utility.
   - `usage`: provider usage/rate-limit probe with timeout + graceful degradation.
   - `subagents`: delegated to [pi-subagents](https://github.com/nicobailon/pi-subagents) (installed separately, builtins disabled).
-  - `custom-compaction`: policy-based compaction profiles and summary templates.
   - `output-cap`: captures large tool outputs to files and avoids response bloat.
 - `packages/scheduler` (standalone): `schedule_prompt`, natural-language schedules,
   persisted tasks, idle dispatch, and multi-instance ownership/lease coordination.
@@ -63,7 +62,6 @@ Package responsibilities:
 | session-status | [settings](packages/extensions/docs/extensions/session-status/settings.md) · [maintenance](packages/extensions/docs/extensions/session-status/maintenance.md) |
 | usage | [settings](packages/extensions/docs/extensions/usage/settings.md) · [maintenance](packages/extensions/docs/extensions/usage/maintenance.md) |
 | pi-mcp-adapter | [settings](packages/pi-mcp-adapter/docs/extensions/pi-mcp-adapter/settings.md) · [maintenance](packages/pi-mcp-adapter/docs/extensions/pi-mcp-adapter/maintenance.md) |
-| custom-compaction | [settings](packages/extensions/docs/extensions/custom-compaction/settings.md) · [maintenance](packages/extensions/docs/extensions/custom-compaction/maintenance.md) |
 | output-cap | [settings](packages/extensions/docs/extensions/output-cap/settings.md) · [maintenance](packages/extensions/docs/extensions/output-cap/maintenance.md) |
 | verbosity-control | [settings](packages/extensions/docs/extensions/verbosity-control/settings.md) · [maintenance](packages/extensions/docs/extensions/verbosity-control/maintenance.md) |
 | scheduler | [settings](packages/scheduler/docs/extensions/scheduler/settings.md) · [maintenance](packages/scheduler/docs/extensions/scheduler/maintenance.md) |

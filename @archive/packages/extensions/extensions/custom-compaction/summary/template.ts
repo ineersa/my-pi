@@ -6,7 +6,7 @@ import type {
 	ModelEntry,
 	SummaryPolicy,
 	TemplateResolution,
-} from "../policy/types.js";
+} from "../policy/types";
 
 const TEMPLATE_DIR = "compaction-templates";
 const TEMPLATE_FILE = "compaction-template.md";

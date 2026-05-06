@@ -1,8 +1,8 @@
 import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import type { Api, AssistantMessage, Model } from "@mariozechner/pi-ai";
 import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { parseModelSelector } from "../policy/parse.js";
-import type { CompactionPolicy, ModelEntry, ParseResult } from "../policy/types.js";
+import { parseModelSelector } from "../policy/parse";
+import type { CompactionPolicy, ModelEntry, ParseResult } from "../policy/types";
 
 type NotifyFn = (
 	ctx: ExtensionContext,

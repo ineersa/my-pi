@@ -17,7 +17,6 @@
       "./extensions/rewind/rewind.ts",
       "./extensions/session-status.ts",
       "./extensions/usage.ts",
-      "./extensions/custom-compaction/custom-compaction.ts",
       "./extensions/output-cap/output-cap.ts",
       "./extensions/ide/ide.ts",
       "./extensions/verbosity-control/verbosity-control.ts"

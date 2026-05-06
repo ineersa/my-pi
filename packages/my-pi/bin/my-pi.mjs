@@ -209,7 +209,6 @@ function run(pi, command, args, { label }) {
 }
 
 const PI_SETTINGS_AGENT_FILES = [
-	"compaction-policy.json",
 	"mcp.json",
 	"models.json",
 	"safe-guard.json",

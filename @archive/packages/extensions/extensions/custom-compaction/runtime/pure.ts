@@ -1,5 +1,5 @@
-import { applyProfileOverrides } from "../policy/merge.js";
-import type { AutoMaxTokensConfig, CompactionPolicy, ProfileOverride, ProactiveTriggerInput } from "../policy/types.js";
+import { applyProfileOverrides } from "../policy/merge";
+import type { AutoMaxTokensConfig, CompactionPolicy, ProfileOverride, ProactiveTriggerInput } from "../policy/types";
 
 /** Compute the effective maxTokens from policy, resolving adaptive config if set. */
 export function computeEffectiveMaxTokens(
