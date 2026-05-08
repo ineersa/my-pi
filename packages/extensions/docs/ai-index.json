@@ -115,6 +115,17 @@
       }
     },
     {
+      "id": "fork",
+      "kind": "extension",
+      "name": "fork",
+      "entry": "./extensions/fork/fork.ts",
+      "docs": {
+        "settings": "docs/extensions/fork/settings.md",
+        "usage": "docs/extensions/fork/usage.md",
+        "maintenance": "docs/extensions/fork/maintenance.md"
+      }
+    },
+    {
       "id": "ide",
       "kind": "extension",
       "name": "ide",

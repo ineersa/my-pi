@@ -18,6 +18,7 @@
       "./extensions/session-status.ts",
       "./extensions/usage.ts",
       "./extensions/output-cap/output-cap.ts",
+      "./extensions/fork/fork.ts",
       "./extensions/ide/ide.ts",
       "./extensions/verbosity-control/verbosity-control.ts"
     ]

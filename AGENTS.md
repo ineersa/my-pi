@@ -39,7 +39,7 @@ Package responsibilities:
   - `rewind`: git-based checkpoint snapshots + deterministic restore flows.
   - `session-status`: minimal session lifecycle status utility.
   - `usage`: provider usage/rate-limit probe with timeout + graceful degradation.
-  - `subagents`: delegated to [pi-subagents](https://github.com/nicobailon/pi-subagents) (installed separately, builtins disabled).
+  - `subagents`: trimmed subagent extension from `packages/subagents` (single + parallel foreground execution, agent discovery, skill injection, model fallback, recursion guard).
   - `output-cap`: captures large tool outputs to files and avoids response bloat.
 - `packages/scheduler` (standalone): `schedule_prompt`, natural-language schedules,
   persisted tasks, idle dispatch, and multi-instance ownership/lease coordination.
@@ -67,6 +67,7 @@ Package responsibilities:
 | scheduler | [settings](packages/scheduler/docs/extensions/scheduler/settings.md) · [maintenance](packages/scheduler/docs/extensions/scheduler/maintenance.md) |
 | schedule_prompt (tool) | [settings](packages/scheduler/docs/tools/schedule_prompt/settings.md) · [maintenance](packages/scheduler/docs/tools/schedule_prompt/maintenance.md) |
 | jetbrains-index | [settings](packages/jetbrains-index/docs/extensions/jetbrains-index/settings.md) · [maintenance](packages/jetbrains-index/docs/extensions/jetbrains-index/maintenance.md) |
+| subagent | [settings](packages/subagents/docs/extensions/subagent/settings.md) · [maintenance](packages/subagents/docs/extensions/subagent/maintenance.md) |
 
 ## How to Run Things
 
@@ -145,8 +146,10 @@ When working with this codebase:
 - [JetBrains Index README](packages/jetbrains-index/README.md)
 - [Themes README](packages/themes/README.md)
 - [Installer README](packages/my-pi/README.md)
+- [Subagents README](packages/subagents/README.md)
 - Package docs indexes:
   - [Extensions ai-index](packages/extensions/docs/ai-index.json)
   - [Scheduler ai-index](packages/scheduler/docs/ai-index.json)
   - [JetBrains Index ai-index](packages/jetbrains-index/docs/ai-index.json)
+  - [Subagents ai-index](packages/subagents/docs/ai-index.json)
 

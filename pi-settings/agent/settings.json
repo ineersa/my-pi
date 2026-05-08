@@ -1,25 +1,28 @@
 {
-  "lastChangelogVersion": "0.67.2",
-  "defaultThinkingLevel": "medium",
+  "lastChangelogVersion": "0.72.1",
+  "defaultThinkingLevel": "high",
   "defaultProvider": "openai-codex",
-  "defaultModel": "gpt-5.3-codex",
+  "defaultModel": "gpt-5.4",
   "enabledModels": [
-    "google-gemini-cli/gemini-3-flash-preview",
-    "google-gemini-cli/gemini-3.1-pro-preview",
     "llama.cpp/flash",
-    "openai-codex/gpt-5.3-codex",
-    "zai/glm-5.1"
+    "zai/glm-5.1",
+    "deepseek/deepseek-v4-flash",
+    "deepseek/deepseek-v4-pro",
+    "openai-codex/gpt-5.4-mini",
+    "openai-codex/gpt-5.4"
   ],
   "theme": "cyberpunk",
   "packages": [
     "../../claw/my-pi/packages/extensions",
-    "../../claw/my-pi/packages/scheduler",
-    "../../claw/my-pi/packages/themes"
+    "../../claw/my-pi/packages/themes",
+    "../../claw/my-pi/packages/jetbrains-index",
+    "../../claw/pi-observational-memory",
+    "../../claw/my-pi/packages/pi-mcp-adapter"
   ],
   "hideThinkingBlock": true,
   "observational-memory": {
     "observationThresholdTokens": 2000,
-    "compactionThresholdTokens": 50000,
+    "compactionThresholdTokens": 60000,
     "reflectionThresholdTokens": 30000,
     "passive": false,
     "compactionModel": {
@@ -29,7 +32,11 @@
   },
   "compaction": {
     "enabled": true,
-    "keepRecentTokens": 20000,
+    "keepRecentTokens": 25000,
     "reserveTokens": 16384
+  },
+  "pi-fork": {
+    "defaultModel": "deepseek/deepseek-v4-flash",
+    "defaultThinking": "xhigh"
   }
 }

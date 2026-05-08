@@ -29,4 +29,9 @@ export const INSTALLER_PACKAGES = [
     npmName: "@ineersa/my-pi-mcp-adapter",
     localPath: "packages/pi-mcp-adapter",
   },
+  {
+    name: "pi-subagents",
+    npmName: "pi-subagents",
+    localPath: "packages/subagents",
+  },
 ];

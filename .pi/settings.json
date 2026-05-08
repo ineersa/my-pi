@@ -1,4 +1,15 @@
 {
-  "packages": [],
-  "theme": "cyberpunk"
+  "packages": [
+    "../packages/extensions",
+    "../packages/jetbrains-index",
+    "../../pi-observational-memory",
+    "../packages/themes",
+    "../packages/pi-mcp-adapter",
+    "../packages/subagents"
+  ],
+  "theme": "cyberpunk",
+  "pi-fork": {
+    "defaultModel": "deepseek/deepseek-v4-flash",
+    "defaultThinking": "xhigh"
+  }
 }
