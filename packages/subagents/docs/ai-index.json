@@ -1,0 +1,19 @@
+{
+  "spec": "my-pi.ai-docs/v1",
+  "package": "pi-subagents",
+  "version": "0.17.1",
+  "updatedAt": "2026-05-07",
+  "entities": [
+    {
+      "id": "subagent",
+      "kind": "extension",
+      "name": "subagent",
+      "entry": "./index.ts",
+      "docs": {
+        "settings": "docs/extensions/subagent/settings.md",
+        "usage": "docs/extensions/subagent/usage.md",
+        "maintenance": "docs/extensions/subagent/maintenance.md"
+      }
+    }
+  ]
+}

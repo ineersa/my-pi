@@ -1,0 +1,38 @@
+{
+  "name": "pi-subagents",
+  "version": "0.17.1",
+  "description": "Pi extension for delegating tasks to subagents with single and parallel foreground execution",
+  "type": "module",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": "Nico Bailon",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ineersa/my-pi.git",
+    "directory": "packages/subagents"
+  },
+  "homepage": "https://github.com/ineersa/my-pi/tree/main/packages/subagents#readme",
+  "bugs": {
+    "url": "https://github.com/ineersa/my-pi/issues"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "files": [
+    "*.ts",
+    "docs",
+    "README.md",
+    "!**/*.test.ts"
+  ],
+  "peerDependencies": {
+    "@mariozechner/pi-agent-core": "*",
+    "@mariozechner/pi-ai": "*",
+    "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-tui": "*",
+    "@sinclair/typebox": "*"
+  }
+}
