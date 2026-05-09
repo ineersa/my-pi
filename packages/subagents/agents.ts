@@ -6,6 +6,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { parseFrontmatter } from "./frontmatter.ts";
+import type { McpAccess } from "./types.ts";
 
 export type AgentScope = "user" | "project" | "both";
 export type AgentSource = "user" | "project";
@@ -27,7 +28,7 @@ export interface AgentConfig {
 	name: string;
 	description: string;
 	tools?: string[];
-	mcpDirectTools?: string[];
+	mcpAccess: McpAccess;
 	model?: string;
 	fallbackModels?: string[];
 	thinking?: string;
@@ -69,7 +70,6 @@ function loadAgentsFromDir(dir: string, source: AgentSource): AgentConfig[] {
 
 	for (const entry of entries) {
 		if (!entry.name.endsWith(".md")) continue;
-		if (entry.name.endsWith(".chain.md")) continue;
 		if (!entry.isFile() && !entry.isSymbolicLink()) continue;
 
 		const filePath = path.join(dir, entry.name);
@@ -91,13 +91,23 @@ function loadAgentsFromDir(dir: string, source: AgentSource): AgentConfig[] {
 			.map((t) => t.trim())
 			.filter(Boolean);
 
-		const mcpDirectTools: string[] = [];
+		let mcpAccess: McpAccess = { kind: "none" };
 		const tools: string[] = [];
 		if (rawTools) {
+			const mcpWildcard = rawTools.includes("mcp:*");
+			const mcpSpecifics = rawTools.filter((t) => t.startsWith("mcp:") && t !== "mcp:*");
+
+			if (mcpWildcard) {
+				mcpAccess = { kind: "all" };
+			} else if (mcpSpecifics.length > 0) {
+				mcpAccess = {
+					kind: "specific",
+					specs: mcpSpecifics.map((t) => t.slice(4)),
+				};
+			}
+
 			for (const tool of rawTools) {
-				if (tool.startsWith("mcp:")) {
-					mcpDirectTools.push(tool.slice(4));
-				} else {
+				if (!tool.startsWith("mcp:")) {
 					tools.push(tool);
 				}
 			}
@@ -158,7 +168,7 @@ function loadAgentsFromDir(dir: string, source: AgentSource): AgentConfig[] {
 			name: frontmatter.name,
 			description: frontmatter.description,
 			tools: tools.length > 0 ? tools : undefined,
-			mcpDirectTools: mcpDirectTools.length > 0 ? mcpDirectTools : undefined,
+			mcpAccess,
 			model: frontmatter.model,
 			fallbackModels: fallbackModels && fallbackModels.length > 0 ? fallbackModels : undefined,
 			thinking: frontmatter.thinking,
@@ -232,7 +242,7 @@ export function discoverAgents(cwd: string, scope: AgentScope): AgentDiscoveryRe
 	const userAgents = [...userAgentsOld, ...userAgentsNew];
 
 	const projectAgents = scope === "user" ? [] : projectAgentDirs.flatMap((dir) => loadAgentsFromDir(dir, "project"));
-	// Merge: user > project for priority (project wins, then user)
+	// Merge: project overrides user on name collision (project wins)
 	const agentMap = new Map<string, AgentConfig>();
 	for (const agent of userAgents) agentMap.set(agent.name, agent);
 	for (const agent of projectAgents) agentMap.set(agent.name, agent);

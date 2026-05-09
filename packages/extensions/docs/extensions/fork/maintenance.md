@@ -19,7 +19,7 @@ Notes:
 | `cost.ts` | Cost aggregation across session entries and fork result usages. Provides `aggregateInclusiveCost` and `formatForkCostStatus` for the `forks +$...` footer |
 | `session-result.ts` | Session file result parser — reads child Pi's `session.jsonl` after exit and extracts final output, usage, model metadata. Older/supplemental to the `result.json` artifact path |
 | `types.ts` | Shared type definitions: `ForkResult`, `ForkToolExecution`, `ForkThinkingState`, `ForkActivity`, `ForkRetryState`, `UsageStats`, `ForkDetails`. Also normalization helpers: `normalizeCompletedResult`, `isResultSuccess`, `isResultError` |
-| `status-store.ts` | Persistent run status store under `~/.pi/agent/extensions/fork/runs/<runId>/`. Enforces `MAX_CONCURRENT_FORKS = 1`, stale-run reaping (30-min threshold), `createRun`/`updateRun`/`completeRun`/`failRun`/`countRunningForks`/`listRuns` |
+| `status-store.ts` | Persistent run status store under `~/.pi/agent/extensions/fork/runs/<runId>/`. Enforces `MAX_CONCURRENT_FORKS = 1` per working directory (`cwd`), stale-run reaping (30-min threshold), `createRun`/`updateRun`/`completeRun`/`failRun`/`countRunningForks`/`listRuns` |
 | `env.ts` | `buildChildEnv` — builds child process environment from configured overrides, always forces `PI_OFFLINE=1` and `PI_FORK=1` |
 | `tmux.ts` | Tmux pane management: `createForkPane` (right-side horizontal split, `main-vertical` layout restore), `killPane`, `paneExists`, `sendCtrlCToPane`, `startPaneLogPipe`, `stopPaneLogPipe`, `getPanePid` |
 | `plans/` | Design documents for the tmux-interactive fork rewrite |
@@ -48,7 +48,7 @@ When `runFork` launches a child:
 
 ## Concurrency
 
-- `MAX_CONCURRENT_FORKS = 1` in `status-store.ts` (down from the original plan of 2).
+- `MAX_CONCURRENT_FORKS = 1` in `status-store.ts`, enforced per working directory (`cwd`).
 - Stale runs (no update for 30+ minutes) are reaped lazily before `countRunningForks()`.
 - Background forks continue running even after the parent tool call completes; they deliver results via `pi.sendUserMessage`.
 
@@ -65,4 +65,4 @@ The `forks +$...` footer status line is computed from all `fork` tool results in
 
 ## Cleanup on session shutdown
 
-`cleanupRunningForks()` iterates all recent runs in `running` state, kills their tmux panes, sends SIGTERM as fallback, and marks them as failed with `"Parent session shut down. Fork was aborted."`.
+`cleanupRunningForks(cwd, parentSessionFile)` iterates recent runs for the current working directory owned by the shutting-down parent session, kills their tmux panes, sends SIGTERM as fallback, and marks them as failed with `"Parent session shut down. Fork was aborted."`.

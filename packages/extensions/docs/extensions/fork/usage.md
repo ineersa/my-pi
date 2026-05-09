@@ -22,7 +22,7 @@ Behavior:
   4. The child auto-exits after completing its first full agent response (set to `1` environment triggers hooks that write the result artifact and call `process.exit(0)`).
   5. The parent polls the pane log for an exit marker, then reads the result artifact (`result.json`) to reconstruct the parsed `ForkResult`.
   6. On completion or error, the tmux pane is auto-closed and the result is returned as tool output.
-  7. Concurrency is limited to **1 concurrent fork** (the status-store enforces `MAX_CONCURRENT_FORKS = 1` with stale-run reaping).
+  7. Concurrency is limited to **1 concurrent fork per working directory** (the status-store enforces `MAX_CONCURRENT_FORKS = 1` per `cwd`, with stale-run reaping).
 - **Background mode** (`background: true`):
   - Same launch flow but returns immediately with a run ID.
   - A follow-up message (`[FORK_DONE]`) is sent automatically when the fork finishes or fails.

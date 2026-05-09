@@ -23,6 +23,7 @@ import { createSubagentExecutor } from "./subagent-executor.ts";
 import {
 	type Details,
 	type ExtensionConfig,
+	type SubagentChildResult,
 	type SubagentState,
 	DEFAULT_ARTIFACT_CONFIG,
 } from "./types.ts";
@@ -59,7 +60,120 @@ function expandTilde(p: string): string {
 	return p.startsWith("~/") ? path.join(os.homedir(), p.slice(2)) : p;
 }
 
+function collectChildUsage(messages: unknown[]): {
+	input: number; output: number; cacheRead: number; cacheWrite: number; cost: number; turns: number;
+} {
+	const usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, turns: 0 };
+	for (const message of messages) {
+		if (!message || typeof message !== "object") continue;
+		const u = (message as Record<string, unknown>).usage as Record<string, unknown> | undefined;
+		if (!u) continue;
+		usage.input += typeof u.input === "number" ? u.input : 0;
+		usage.output += typeof u.output === "number" ? u.output : 0;
+		usage.cacheRead += typeof u.cacheRead === "number" ? u.cacheRead : 0;
+		usage.cacheWrite += typeof u.cacheWrite === "number" ? u.cacheWrite : 0;
+		const costVal = u.cost;
+		usage.cost += typeof costVal === "number"
+			? costVal
+			: typeof costVal === "object" && costVal !== null && typeof (costVal as Record<string, unknown>).total === "number"
+				? ((costVal as Record<string, number>).total)
+				: 0;
+		usage.turns++;
+	}
+	return usage;
+}
+
+function getLastAssistantMetadata(messages: unknown[]): {
+	provider?: string; model?: string; stopReason?: string;
+} {
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const message = messages[i];
+		if (!message || typeof message !== "object") continue;
+		const candidate = message as Record<string, unknown>;
+		if (candidate.role !== "assistant") continue;
+		return {
+			provider: typeof candidate.provider === "string" ? candidate.provider : undefined,
+			model: typeof candidate.model === "string" ? candidate.model : undefined,
+			stopReason: typeof candidate.stopReason === "string" ? candidate.stopReason : undefined,
+		};
+	}
+	return {};
+}
+
+function writeSubagentChildResult(messages: unknown[]): void {
+	const resultPath = process.env.PI_SUBAGENT_RESULT_PATH?.trim();
+	if (!resultPath) return;
+
+	const safeMessages = Array.isArray(messages) ? messages : [];
+	const metadata = getLastAssistantMetadata(safeMessages);
+
+	const result: SubagentChildResult = {
+		task: process.env.PI_SUBAGENT_TASK ?? "",
+		exitCode: 0,
+		messages: safeMessages as import("@mariozechner/pi-ai").Message[],
+		usage: collectChildUsage(safeMessages),
+		model: metadata.model,
+		provider: metadata.provider,
+		stopReason: metadata.stopReason,
+		finalOutput: undefined, // parent extracts finalOutput from messages
+		sawAgentEnd: true,
+	};
+
+	fs.mkdirSync(path.dirname(resultPath), { recursive: true });
+	const tmpPath = `${resultPath}.tmp`;
+	fs.writeFileSync(tmpPath, JSON.stringify(result, null, 2), "utf-8");
+	fs.renameSync(tmpPath, resultPath);
+}
+
 export default function registerSubagentExtension(pi: ExtensionAPI): void {
+	// ── Child mode: register only passive hooks, no subagent tool ──
+	if (process.env.PI_SUBAGENT_CHILD === "1") {
+		let agentCompleted = false;
+		let resultWritten = false;
+		const finalizedMessages: unknown[] = [];
+
+		const pushFinalizedMessage = (message: unknown) => {
+			if (!message || typeof message !== "object") return;
+			const role = (message as Record<string, unknown>).role;
+			if (role === "user") return;
+			finalizedMessages.push(message);
+		};
+
+		const finishSuccess = () => {
+			if (resultWritten) return;
+			resultWritten = true;
+			writeSubagentChildResult(finalizedMessages);
+			setTimeout(() => {
+				process.exit(0);
+			}, 300);
+		};
+
+		pi.on("message_end", (event) => {
+			pushFinalizedMessage((event as unknown as Record<string, unknown>).message);
+		});
+
+		pi.on("turn_end", (event) => {
+			const record = event as unknown as Record<string, unknown>;
+			const message = record.message as Record<string, unknown> | undefined;
+			const toolResults = Array.isArray(record.toolResults) ? record.toolResults : [];
+			if (message?.role === "assistant" && toolResults.length === 0) {
+				finishSuccess();
+			}
+		});
+
+		pi.on("agent_end", () => {
+			if (agentCompleted) return;
+			agentCompleted = true;
+			finishSuccess();
+		});
+
+		pi.on("session_shutdown", () => {
+			process.exit(resultWritten ? 0 : 1);
+		});
+
+		return;
+	}
+
 	const config = loadConfig();
 	cleanupAllArtifactDirs(DEFAULT_ARTIFACT_CONFIG.cleanupDays);
 

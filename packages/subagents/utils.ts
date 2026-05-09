@@ -5,7 +5,7 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { Message, TextContent, ToolCall } from "@mariozechner/pi-ai";
+import type { Message, TextContent } from "@mariozechner/pi-ai";
 import { formatToolCall } from "./formatters.ts";
 import type { AgentProgress, Details, DisplayItem, ErrorInfo, SingleResult, ToolCallSummary } from "./types.ts";
 
@@ -163,10 +163,10 @@ export function detectSubagentError(messages: Message[]): ErrorInfo {
 	}
 
 	if (lastAssistantTextIndex === -1) {
-		const lastAssistant = messages.find(m => m.role === "assistant");
+		const lastAssistant = messages.find((m) => m.role === "assistant");
 		if (lastAssistant && lastAssistant.content) {
-			const lastToolCall = (lastAssistant.content as Array<{type?: string; name?: string}>)
-				.find(c => c.type === "toolCall");
+			const lastToolCall = (lastAssistant.content as Array<{ type?: string; name?: string }>)
+				.find((c) => c.type === "toolCall");
 			if (lastToolCall?.name) {
 				return {
 					hasError: true,
@@ -175,35 +175,28 @@ export function detectSubagentError(messages: Message[]): ErrorInfo {
 				};
 			}
 		}
-		return { hasError: false };
 	}
 
-	const lastAssistantMsg = messages[lastAssistantTextIndex];
-	if (!lastAssistantMsg) return { hasError: false };
-	const contentArray = Array.isArray(lastAssistantMsg.content) ? lastAssistantMsg.content : [];
-	const lastContent = contentArray
-		.filter((c): c is TextContent => c.type === "text")
-		.map((c) => c.text)
-		.join("\n")
-		.trim() || "";
+	const scanStart = lastAssistantTextIndex >= 0 ? lastAssistantTextIndex + 1 : 0;
 
-	const failurePatterns = [
-		{ regex: /error/i, type: "error_mentioned" },
-		{ regex: /fail(?:ed|ure)?/i, type: "failure_mentioned" },
-		{ regex: /could not|couldn't|unable to|not able to/i, type: "inability_mentioned" },
-		{ regex: /exit code \d+/i, type: "exit_code_mentioned" },
-		{ regex: /Command exited with code \d+/i, type: "bash_exit_code" },
-	];
-	for (const { regex, type } of failurePatterns) {
-		if (regex.test(lastContent)) {
-			const lastToolCall = contentArray
-				.find((c): c is ToolCall => c.type === "toolCall");
+	for (let i = messages.length - 1; i >= scanStart; i--) {
+		const msg = messages[i];
+		if (msg.role !== "toolResult") continue;
+		const toolName = "toolName" in msg && typeof msg.toolName === "string" ? msg.toolName : undefined;
+		const isError = "isError" in msg && msg.isError === true;
+
+		if (isError) {
+			const text = msg.content.find((c): c is TextContent => c.type === "text");
+			const details = text?.text;
+			const exitMatch = details?.match(/exit(?:ed)?\s*(?:with\s*)?(?:code|status)?\s*[:\s]?\s*(\d+)/i);
 			return {
 				hasError: true,
-				errorType: type,
-				details: lastToolCall?.name || lastContent.slice(0, 200),
+				exitCode: exitMatch ? parseInt(exitMatch[1], 10) : 1,
+				errorType: toolName || "tool",
+				details: details?.slice(0, 200),
 			};
 		}
+
 	}
 
 	return { hasError: false };

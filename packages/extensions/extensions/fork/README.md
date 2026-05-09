@@ -157,7 +157,7 @@ forks. Disable the extra footer line with:
 
 ## Concurrency
 
-Only **1 concurrent fork** is allowed. Attempting a second fork while one is active returns an error immediately. Stale/orphaned runs (no update for 30+ minutes) are automatically reaped.
+Only **1 concurrent fork per working directory** is allowed. Attempting a second fork from the same project while one is active returns an error immediately. Forks in different working directories can run at the same time. Stale/orphaned runs (no update for 30+ minutes) are automatically reaped.
 
 ## Requirements
 

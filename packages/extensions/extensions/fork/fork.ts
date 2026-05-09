@@ -326,9 +326,10 @@ function updateForkCostStatus(ctx: ExtensionContext): void {
  * Kill any running fork panes/PIDs and mark them as failed.
  * Called during session_shutdown to clean up orphaned background forks.
  */
-function cleanupRunningForks(): void {
-  const recent = listRuns(100);
+function cleanupRunningForks(cwd?: string, parentSessionFile?: string | null): void {
+  const recent = listRuns(100, cwd);
   for (const run of recent) {
+    if (parentSessionFile && run.parentSessionFile !== parentSessionFile) continue;
     if (run.state !== "running") continue;
 
     // Try pane kill first (most reliable in tmux)
@@ -410,7 +411,7 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("session_shutdown", async (_event, ctx) => {
     ctx.ui.setStatus(FORK_COST_STATUS_KEY, undefined);
-    cleanupRunningForks();
+    cleanupRunningForks(ctx.cwd, ctx.sessionManager.getSessionFile());
   });
 
   // ── Fork tool ──────────────────────────────────────────────────
@@ -424,18 +425,18 @@ export default function (pi: ExtensionAPI) {
       "Use background:true to launch without waiting — you will receive a follow-up when it completes. " +
       "Forks return dense, concrete output: the snippets, signatures, and relationships you'd otherwise have to discover yourself, plus anything they found beyond the task that's worth knowing. " +
       "Use for anything that would generate context noise: exploration, implementation, testing, iteration. " +
-      "IMPORTANT: Only 1 fork can run at a time. Never launch more than one fork concurrently. If you need multiple forks, wait for the current fork to finish before launching the next one. Do not attempt parallel fork launches.",
+      "IMPORTANT: Only 1 fork can run at a time per working directory. Never launch more than one fork concurrently from the same cwd. If you need multiple forks for one project, wait for the current fork in that cwd to finish before launching the next one.",
     parameters: ForkParams as any,
     renderCall: renderForkCall,
     renderResult: renderForkResult,
 
     async execute(_toolCallId, params: ForkToolParams, signal, onUpdate, ctx) {
       // ── Concurrency check ──────────────────────────────────────
-      const running = countRunningForks();
+      const running = countRunningForks(ctx.cwd);
       if (running >= 1) {
         const result = emptyFailedResult(
           params.task,
-          "Another fork is already running. Only 1 concurrent fork is allowed. Wait for the current fork to finish and try again.",
+          "Another fork is already running for this working directory. Only 1 concurrent fork is allowed per cwd. Wait for the current fork in this project to finish and try again.",
         );
         return {
           content: [{ type: "text" as const, text: getResultSummaryText(result) }],
@@ -471,7 +472,13 @@ export default function (pi: ExtensionAPI) {
       const isBackground = params.background === true;
 
       // ── Register run ───────────────────────────────────────────
-      const runStatus = createRun(ctx.cwd, params.task, resolvedModel, resolvedThinking);
+      const runStatus = createRun(
+        ctx.cwd,
+        params.task,
+        resolvedModel,
+        resolvedThinking,
+        ctx.sessionManager.getSessionFile(),
+      );
       const runId = runStatus.runId;
 
       // ── Shared fork launch ─────────────────────────────────────

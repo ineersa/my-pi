@@ -6,7 +6,7 @@
  *
  * Responsibilities:
  * - Create/update/complete/fail runs
- * - Enforce MAX_CONCURRENT_FORKS = 2 global cap
+ * - Enforce MAX_CONCURRENT_FORKS = 1 per working directory (cwd)
  * - Reap stale/orphaned runs on a time-based threshold
  */
 
@@ -29,6 +29,7 @@ export interface ForkRunStatus {
   tmuxPaneId?: string;
   tmuxWindowId?: string;
   tmuxSessionName?: string;
+  parentSessionFile?: string;
   sessionFile?: string;
   logPath?: string;
   resultPath?: string;
@@ -60,6 +61,16 @@ function runDir(runId: string): string {
 
 function statusPath(runId: string): string {
   return path.join(runDir(runId), "status.json");
+}
+
+function normalizeCwd(cwd?: string): string | undefined {
+  return cwd ? path.resolve(cwd) : undefined;
+}
+
+function matchesCwd(status: ForkRunStatus, cwd?: string): boolean {
+  const normalizedCwd = normalizeCwd(cwd);
+  if (!normalizedCwd) return true;
+  return normalizeCwd(status.cwd) === normalizedCwd;
 }
 
 export function getRunArtifactPath(runId: string, fileName: string): string {
@@ -143,6 +154,7 @@ export function createRun(
   task?: string,
   model?: string,
   thinking?: string,
+  parentSessionFile?: string | null,
 ): ForkRunStatus {
   const runId = generateRunId();
   const now = Date.now();
@@ -151,10 +163,11 @@ export function createRun(
     state: "running",
     startedAt: now,
     lastUpdate: now,
-    cwd,
+    cwd: normalizeCwd(cwd),
     task,
     model,
     thinking,
+    parentSessionFile: parentSessionFile ?? undefined,
   };
   writeJson(statusPath(runId), status);
   return status;
@@ -208,10 +221,11 @@ export function getRunStatus(runId: string): ForkRunStatus | null {
 }
 
 /**
- * Count currently running fork processes across all runs.
+ * Count currently running fork processes.
+ * If cwd is provided, only runs for that working directory are counted.
  * Reaps stale runs first so orphaned entries never block new launches.
  */
-export function countRunningForks(): number {
+export function countRunningForks(cwd?: string): number {
   reapStaleRuns();
 
   let entries: string[];
@@ -226,7 +240,7 @@ export function countRunningForks(): number {
   let count = 0;
   for (const entry of entries) {
     const status = readJson(statusPath(entry)) as ForkRunStatus | null;
-    if (status && status.state === "running") {
+    if (status && status.state === "running" && matchesCwd(status, cwd)) {
       count++;
     }
   }
@@ -237,7 +251,7 @@ export function countRunningForks(): number {
 /**
  * List recent fork runs sorted by most recent lastUpdate first.
  */
-export function listRuns(limit: number = 20): ForkRunStatus[] {
+export function listRuns(limit: number = 20, cwd?: string): ForkRunStatus[] {
   reapStaleRuns();
 
   let entries: string[];
@@ -252,7 +266,7 @@ export function listRuns(limit: number = 20): ForkRunStatus[] {
   const runs: ForkRunStatus[] = [];
   for (const entry of entries) {
     const status = readJson(statusPath(entry)) as ForkRunStatus | null;
-    if (status) runs.push(status);
+    if (status && matchesCwd(status, cwd)) runs.push(status);
   }
 
   const rank = (s: ForkRunState): number => {

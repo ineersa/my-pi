@@ -14,7 +14,7 @@ import { aggregateParallelOutputs } from "./parallel-utils.ts";
 import { resolveStepBehavior } from "./settings.ts";
 import { normalizeSkillInput } from "./skills.ts";
 
-import { finalizeSingleOutput, injectSingleOutputInstruction, resolveSingleOutputPath } from "./single-output.ts";
+
 import { compactForegroundDetails, getSingleResultOutput, mapConcurrent } from "./utils.ts";
 import {
 	type AgentProgress,
@@ -421,17 +421,12 @@ async function runSinglePath(data: ExecutionContextData, deps: ExecutorDeps): Pr
 		currentProvider,
 	);
 	let skillOverride: string[] | false | undefined = normalizeSkillInput(params.skill);
-	const rawOutput = params.output !== undefined ? params.output : agentConfig.output;
-	let effectiveOutput: string | false | undefined = rawOutput === true ? agentConfig.output : (rawOutput as string | false | undefined);
 	const currentMaxSubagentDepth = resolveCurrentMaxSubagentDepth(deps.config.maxSubagentDepth);
 	const maxSubagentDepth = resolveChildMaxSubagentDepth(currentMaxSubagentDepth, agentConfig.maxSubagentDepth);
-
 
 	if (params.context === "fork") {
 		task = wrapForkTask(task);
 	}
-	const outputPath = resolveSingleOutputPath(effectiveOutput, ctx.cwd, effectiveCwd);
-	task = injectSingleOutputInstruction(task, outputPath);
 
 	let effectiveSkills: string[] | undefined;
 	if (skillOverride === false) {
@@ -450,7 +445,6 @@ async function runSinglePath(data: ExecutionContextData, deps: ExecutorDeps): Pr
 		artifactsDir: artifactConfig.enabled ? artifactsDir : undefined,
 		artifactConfig,
 		maxOutput: params.maxOutput,
-		outputPath,
 		maxSubagentDepth,
 		onUpdate,
 		modelOverride,
@@ -461,15 +455,7 @@ async function runSinglePath(data: ExecutionContextData, deps: ExecutorDeps): Pr
 	if (r.progress) allProgress.push(r.progress);
 	if (r.artifactPaths) allArtifactPaths.push(r.artifactPaths);
 
-	const fullOutput = getSingleResultOutput(r);
-	const finalizedOutput = finalizeSingleOutput({
-		fullOutput,
-		truncatedOutput: r.truncation?.text,
-		outputPath,
-		exitCode: r.exitCode,
-		savedPath: r.savedOutputPath,
-		saveError: r.outputSaveError,
-	});
+	const displayOutput = r.truncation?.text || getSingleResultOutput(r) || "(no output)";
 
 	if (r.exitCode !== 0)
 		return {
@@ -484,7 +470,7 @@ async function runSinglePath(data: ExecutionContextData, deps: ExecutorDeps): Pr
 			isError: true,
 		};
 	return {
-		content: [{ type: "text", text: finalizedOutput.displayOutput || "(no output)" }],
+		content: [{ type: "text", text: displayOutput }],
 		details: compactForegroundDetails({
 			mode: "single",
 			results: [r],

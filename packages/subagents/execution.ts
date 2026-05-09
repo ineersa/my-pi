@@ -2,6 +2,9 @@
  * Core execution logic for running subagents
  */
 
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 import { spawn } from "node:child_process";
 import type { Message } from "@mariozechner/pi-ai";
 import type { AgentConfig } from "./agents.ts";
@@ -21,18 +24,17 @@ import {
 	DEFAULT_MAX_OUTPUT,
 	truncateOutput,
 	getSubagentDepthEnv,
+	readChildResult,
 } from "./types.ts";
 import {
 	getFinalOutput,
 	findLatestSessionFile,
-	detectSubagentError,
 	extractToolArgsPreview,
 	extractTextFromContent,
 } from "./utils.ts";
 import { buildSkillInjection, resolveSkillsWithFallback } from "./skills.ts";
 import { getPiSpawnCommand } from "./pi-spawn.ts";
 import { applyThinkingSuffix, buildPiArgs, cleanupTempDir } from "./pi-args.ts";
-import { captureSingleOutputSnapshot, resolveSingleOutput, type SingleOutputSnapshot } from "./single-output.ts";
 import {
 	buildModelCandidates,
 	formatModelAttemptNote,
@@ -102,7 +104,7 @@ async function runSingleAttempt(
 		skillsWarning?: string;
 		artifactPaths?: ArtifactPaths;
 		attemptNotes: string[];
-		outputSnapshot?: SingleOutputSnapshot;
+		childResultPath: string;
 	},
 ): Promise<SingleResult> {
 	const modelArg = applyThinkingSuffix(model, agent.thinking);
@@ -120,8 +122,9 @@ async function runSingleAttempt(
 		tools: agent.tools,
 		extensions: agent.extensions,
 		systemPrompt: shared.systemPrompt,
-		mcpDirectTools: agent.mcpDirectTools,
+		mcpAccess: agent.mcpAccess,
 		promptFileStem: agent.name,
+		childResultPath: shared.childResultPath,
 	});
 
 	const result: SingleResult = {
@@ -295,14 +298,28 @@ async function runSingleAttempt(
 	});
 	result.exitCode = exitCode;
 
-	if (exitCode === 0 && !result.error) {
-		const errInfo = detectSubagentError(result.messages!);
-		if (errInfo.hasError) {
-			result.exitCode = errInfo.exitCode ?? 1;
-			result.error = errInfo.details
-				? `${errInfo.errorType} failed (exit ${errInfo.exitCode}): ${errInfo.details}`
-				: `${errInfo.errorType} failed with exit code ${errInfo.exitCode}`;
-		}
+	// Read child result artifact as authoritative source of truth
+	let childResult: import("./types.ts").SubagentChildResult | null = null;
+	if (shared.childResultPath) {
+		childResult = readChildResult(shared.childResultPath);
+		// Clean up temp result artifact (best-effort)
+		try { fs.unlinkSync(shared.childResultPath); } catch { /* ignore */ }
+	}
+
+	// Artifact contract: if exit 0 but artifact missing/invalid, it's a failure
+	if (exitCode === 0 && !childResult) {
+		result.exitCode = 1;
+		result.error = "Subagent completed but result artifact was not written. The child may have crashed before writing the result.";
+	}
+
+	// Use artifact data as authoritative content source
+	if (childResult) {
+		result.messages = childResult.messages;
+		result.usage = childResult.usage;
+		result.model = childResult.model ?? result.model;
+		result.finalOutput = childResult.finalOutput ?? getFinalOutput(childResult.messages);
+	} else {
+		result.finalOutput = getFinalOutput(result.messages ?? []);
 	}
 
 	progress.status = result.exitCode === 0 ? "completed" : "failed";
@@ -319,15 +336,6 @@ async function runSingleAttempt(
 		tokens: progress.tokens,
 		durationMs: progress.durationMs,
 	};
-
-	let fullOutput = getFinalOutput(result.messages!);
-	if (options.outputPath && result.exitCode === 0) {
-		const resolvedOutput = resolveSingleOutput(options.outputPath, fullOutput, shared.outputSnapshot);
-		fullOutput = resolvedOutput.fullOutput;
-		result.savedOutputPath = resolvedOutput.savedPath;
-		result.outputSaveError = resolvedOutput.saveError;
-	}
-	result.finalOutput = fullOutput;
 	if (options.onUpdate) {
 		const finalText = result.finalOutput || result.error || "(no output)";
 		const progressSnapshot = snapshotProgress(progress);
@@ -364,7 +372,10 @@ export async function runSync(
 
 	const shareEnabled = options.share === true;
 	const sessionEnabled = Boolean(options.sessionFile || options.sessionDir) || shareEnabled;
-	const outputSnapshot = captureSingleOutputSnapshot(options.outputPath);
+	const childResultPath = path.join(
+		options.artifactsDir || os.tmpdir(),
+		`child-result-${options.runId}-${agent.name.replace(/[^\w.-]/g, "_")}${options.index !== undefined ? `-${options.index}` : ""}.json`,
+	);
 	const skillNames = options.skills ?? agent.skills ?? [];
 	const skillCwd = options.cwd ?? runtimeCwd;
 	const { resolved: resolvedSkills, missing: missingSkills } = resolveSkillsWithFallback(skillNames, skillCwd, runtimeCwd);
@@ -401,6 +412,13 @@ export async function runSync(
 	for (let i = 0; i < modelsToTry.length; i++) {
 		const candidate = modelsToTry[i];
 		if (candidate) attemptedModels.push(candidate);
+		// Use attempt-indexed path to prevent stale artifact reuse across retries
+		const attemptChildResultPath = modelsToTry.length > 1
+			? path.join(
+				options.artifactsDir || os.tmpdir(),
+				`child-result-${options.runId}-${agent.name.replace(/[^\w.-]/g, "_")}${options.index !== undefined ? `-${options.index}` : ""}-attempt${i}.json`,
+			)
+			: childResultPath;
 		const result = await runSingleAttempt(runtimeCwd, agent, task, candidate, options, {
 			sessionEnabled,
 			systemPrompt,
@@ -408,7 +426,7 @@ export async function runSync(
 			skillsWarning: missingSkills.length > 0 ? `Skills not found: ${missingSkills.join(", ")}` : undefined,
 			artifactPaths: artifactPathsResult,
 			attemptNotes,
-			outputSnapshot,
+			childResultPath: attemptChildResultPath,
 		});
 		lastResult = result;
 		sumUsage(aggregateUsage, result.usage);

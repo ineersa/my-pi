@@ -1,11 +1,11 @@
 ---
 name: subagents
-description: Delegate tasks to specialized subagents using pi-subagents extension. Covers single runs, sequential chains, parallel fan-out, background execution, worktree isolation, and agent management. Use when user asks to run subagents, delegates work to agents, mentions scout/worker/reviewer/researcher, or wants to create/manage agents or chains. Also use when starting or coordinating multi-agent workflows.
+description: Delegate tasks to specialized subagents using pi-subagents extension. Covers single and parallel foreground execution. Use when user asks to run subagents, delegates work to agents, mentions scout/worker/reviewer/researcher, or wants to run parallel agent tasks.
 ---
 
 # Subagents
 
-pi-subagents extension for delegating tasks to specialized agents.
+Trimmed pi-subagents extension for delegating tasks to specialized agents.
 
 ## Quick Reference
 
@@ -13,89 +13,58 @@ pi-subagents extension for delegating tasks to specialized agents.
 # Single agent
 { agent: "scout", task: "analyze auth module" }
 
-# Chain (sequential pipeline)
-{ chain: [{ agent: "scout", task: "scan codebase" }, { agent: "reviewer", task: "review {previous}" }] }
-
 # Parallel (concurrent agents)
 { tasks: [{ agent: "scout", task: "audit frontend" }, { agent: "reviewer", task: "audit backend" }] }
-
-# Background
-{ agent: "scout", task: "...", clarify: false, async: true }
-
-# Chain with parallel fan-out
-{ chain: [
-  { agent: "scout", task: "Gather context" },
-  { parallel: [{ agent: "worker", task: "Feature A from {previous}" }, { agent: "worker", task: "Feature B from {previous}" }], worktree: true },
-  { agent: "reviewer", task: "Review {previous}" }
-]}
 ```
 
 ## Available Agents
 
 | Agent | Model | Use for |
 |-------|-------|---------|
-| **scout** | llama.cpp/flash | Fast codebase recon, compressed context handoff |
-| **researcher** | llama.cpp/flash | Web research, multi-source synthesis with citations |
+| **scout** | deepseek/deepseek-v4-flash | Fast codebase recon, compressed context handoff |
 | **reviewer** | (default) + high thinking | Thorough security/correctness/design code review |
 | **worker** | (default) | General-purpose, full capabilities, isolated context |
-| **browser** | (default) | Browser interaction, screenshots, UI testing via playwright-cli |
 
-Agents live in `~/.agents/*.md`. Project overrides in `.pi/agents/*.md`.
+User agents in `~/.agents/*.md` or `~/.pi/agent/agents/*.md`. Project agents in `.pi/agents/*.md` or `.agents/*.md` (project wins on name collision). Custom agents follow the same frontmatter + markdown body format.
 
 ## Key Concepts
 
-- **`systemPromptMode: replace`** (default) — agent gets only its own prompt, clean slate
-- **`inheritProjectContext`** — pass project AGENTS.md to child (user agents: off, builtins: on)
-- **`context: "fork"`** — child starts from a real branched session of parent's current leaf
-- **Chain variables**: `{task}` (original), `{previous}` (prior step output), `{chain_dir}` (artifacts path)
-- **`worktree: true`** — each parallel agent gets isolated git worktree (needs clean git state)
-- **Model fallback** — set `fallbackModels` in agent frontmatter for auto-retry on provider failure
+- **`systemPromptMode`**: `replace` (default for most agents, clean slate) or `append` (used by `delegate`)
+- **`inheritProjectContext`**: pass project AGENTS.md to child (user agents default off, `delegate` defaults on)
+- **`context: "fresh"`** (default): child gets a task-only prompt, no parent session
+- **`context: "fork"`**: wraps task with a fork-oriented preamble and tags result context as `fork` — lightweight, no real session branching
+- **Model fallback**: set `fallbackModels` in agent frontmatter for auto-retry on provider failure
+- **Recursion guard**: `maxSubagentDepth` default 2, per-agent can tighten, env `PI_SUBAGENT_MAX_DEPTH` wins
 
 ## Choosing Execution Mode
 
 | Need | Mode | Example |
 |------|------|---------|
 | One focused task | single | `{ agent: "scout", task: "..." }` |
-| Multi-step pipeline | chain | scout → reviewer |
-| Independent concurrent work | parallel | 2 scouts scanning different areas |
-| Long-running task | async | add `clarify: false, async: true` |
-| Filesystem-safe parallel | worktree | `worktree: true` on parallel step |
+| Independent concurrent work | parallel | `{ tasks: [{ agent: "scout", task: "..." }, { agent: "worker", task: "..." }] }` |
 
-## Intercom Coordination
+Only single and parallel foreground execution are supported. There is no chain, async/background, worktree, or intercom mode.
 
-When pi-intercom is installed, delegated children get runtime instructions for contacting the orchestrator. Configure in `~/.pi/agent/extensions/subagent/config.json`:
+## MCP Access
 
-```json
-{ "intercomBridge": { "mode": "always" } }
-```
+MCP tool access is controlled via the `tools` frontmatter field in agent markdown files:
 
-Children use `intercom({ action: "ask"|"send", to: "<orchestrator>", message: "..." })`.
+| `tools` entry | Effect |
+|---------------|--------|
+| No `mcp:` entries | Only explicitly listed builtin tools; no MCP or ToolSearch |
+| `mcp:*` | Listed builtins + ToolSearch + configured direct MCP tools available |
+| `mcp:server__tool` | Listed builtins + only those specific MCP tools (e.g. `mcp:websearch__search`) |
 
-## Slash Commands
+When MCP is enabled via `mcp:*` or specific entries, the child session auto-loads `pi-mcp-adapter` even if `extensions: []` is set.
 
-| Command | Description |
-|---------|-------------|
-| `/run <agent> <task>` | Run single agent |
-| `/chain agent1 "task" -> agent2 "task"` | Sequential pipeline |
-| `/parallel agent1 "task" -> agent2 "task"` | Concurrent execution |
-| `/agents` | Agents Manager overlay (Ctrl+Shift+A) |
-| `/subagents-status` | Async status overlay |
+## Deterministic Child Result
 
-Add `--bg` to any command for background execution. Add `--fork` for forked context.
+Every subagent child process writes a JSON result artifact to disk before exiting. The parent reads this artifact as the authoritative result. If the artifact is missing, the run is classified as failed regardless of process exit code.
 
-## Management Actions (via tool)
-
-```typescript
-{ action: "list" }                           // discover agents + chains
-{ action: "get", agent: "scout" }            // inspect one
-{ action: "create", config: { name: "...", scope: "user", systemPrompt: "...", ... } }
-{ action: "update", agent: "scout", config: { model: "..." } }
-{ action: "delete", agent: "scout" }
-```
+This replaces the old heuristic error detection (keyword scanning of assistant text). The result includes: `task`, `exitCode`, `messages`, `usage`, `model`, `provider`, `stopReason`.
 
 ## Deep References
 
-- [PARAMETERS.md](PARAMETERS.md) — tool params, chain/parallel item fields, management config, status tool
-- [AGENT-FORMAT.md](AGENT-FORMAT.md) — frontmatter reference, tool/extension semantics, chain files, builtin overrides
-- [TUI.md](TUI.md) — clarify TUI keybindings, agents manager overlay screens & shortcuts
-- [CONFIG.md](CONFIG.md) — extension config.json, recursion guard, artifacts layout, async observability
+- [PARAMETERS.md](PARAMETERS.md) — tool parameters and parallel task shape
+- [AGENT-FORMAT.md](AGENT-FORMAT.md) — frontmatter reference, tool/extension/MCP semantics
+- [CONFIG.md](CONFIG.md) — extension config.json, recursion guard, artifacts

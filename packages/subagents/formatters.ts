@@ -36,9 +36,6 @@ export function formatDuration(ms: number): string {
 }
 
 /**
- * Build a summary string for a completed/failed chain
- */
-/**
  * Format a tool call for display
  */
 export function formatToolCall(name: string, args: Record<string, unknown>, expanded = false): string {

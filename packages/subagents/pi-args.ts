@@ -2,10 +2,15 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
+import type { McpAccess } from "./types.ts";
+import { resolveConfiguredDirectToolNames, visibleToolToEnvSpec } from "./mcp-tools.ts";
 
 const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"];
 const TASK_ARG_LIMIT = 8000;
-const PROMPT_RUNTIME_EXTENSION_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "subagent-prompt-runtime.ts");
+const EXTENSION_DIR = path.dirname(fileURLToPath(import.meta.url));
+const PROMPT_RUNTIME_EXTENSION_PATH = path.join(EXTENSION_DIR, "subagent-prompt-runtime.ts");
+const SUBAGENT_EXTENSION_PATH = path.join(EXTENSION_DIR, "index.ts");
+const MCP_ADAPTER_EXTENSION_PATH = path.join(EXTENSION_DIR, "..", "pi-mcp-adapter", "pi-mcp-adapter.ts");
 
 export interface BuildPiArgsInput {
 	baseArgs: string[];
@@ -21,8 +26,10 @@ export interface BuildPiArgsInput {
 	tools?: string[];
 	extensions?: string[];
 	systemPrompt?: string | null;
-	mcpDirectTools?: string[];
+	mcpAccess?: McpAccess;
 	promptFileStem?: string;
+	/** Path for child result artifact (sets PI_SUBAGENT_RESULT_PATH). Child writes final result here. */
+	childResultPath?: string;
 }
 
 export interface BuildPiArgsResult {
@@ -58,22 +65,57 @@ export function buildPiArgs(input: BuildPiArgsInput): BuildPiArgsResult {
 		args.push("--model", modelArg);
 	}
 
+	// ------------------------------------------------------------------
+	// Build --tools allowlist: builtins + optional ToolSearch + optional MCP direct tool names
+	// ------------------------------------------------------------------
 	const toolExtensionPaths: string[] = [];
+	const mcpAccess = input.mcpAccess ?? { kind: "none" as const };
+
+	// Collect tool names that go into --tools (non-extension-path entries)
+	const toolsAllowlist: string[] = [];
+
 	if (input.tools?.length) {
-		const builtinTools: string[] = [];
 		for (const tool of input.tools) {
 			if (tool.includes("/") || tool.endsWith(".ts") || tool.endsWith(".js")) {
 				toolExtensionPaths.push(tool);
 			} else {
-				builtinTools.push(tool);
+				toolsAllowlist.push(tool);
 			}
-		}
-		if (builtinTools.length > 0) {
-			args.push("--tools", builtinTools.join(","));
 		}
 	}
 
-	const runtimeExtensions = [PROMPT_RUNTIME_EXTENSION_PATH];
+	// Add MCP-related entries to the allowlist based on access mode
+	if (mcpAccess.kind === "specific") {
+		// Case B: specific MCP tools — add their visible names directly
+		for (const spec of mcpAccess.specs) {
+			// specs are visible tool names like "websearch__search"
+			toolsAllowlist.push(spec);
+		}
+	} else if (mcpAccess.kind === "all") {
+		// Case C: mcp:* — add ToolSearch so child can discover deferred MCP tools
+		toolsAllowlist.push("ToolSearch");
+
+		// Also resolve configured direct tool names (best-effort)
+		const configuredDirectNames = resolveConfiguredDirectToolNames();
+		for (const name of configuredDirectNames) {
+			if (!toolsAllowlist.includes(name)) {
+				toolsAllowlist.push(name);
+			}
+		}
+	}
+	// Case A (kind === "none"): no MCP entries added to allowlist
+
+	if (toolsAllowlist.length > 0) {
+		args.push("--tools", toolsAllowlist.join(","));
+	}
+
+	// ------------------------------------------------------------------
+	// Extensions: runtime hooks + tool extension paths + user-specified extensions
+	// ------------------------------------------------------------------
+	const runtimeExtensions = [PROMPT_RUNTIME_EXTENSION_PATH, SUBAGENT_EXTENSION_PATH];
+	if (mcpAccess.kind !== "none") {
+		runtimeExtensions.push(MCP_ADAPTER_EXTENSION_PATH);
+	}
 	if (input.extensions !== undefined) {
 		args.push("--no-extensions");
 		for (const extPath of [...new Set([...runtimeExtensions, ...toolExtensionPaths, ...input.extensions])]) {
@@ -89,6 +131,9 @@ export function buildPiArgs(input: BuildPiArgsInput): BuildPiArgsResult {
 		args.push("--no-skills");
 	}
 
+	// ------------------------------------------------------------------
+	// System prompt
+	// ------------------------------------------------------------------
 	let tempDir: string | undefined;
 	if (input.systemPrompt !== undefined && input.systemPrompt !== null) {
 		tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagent-"));
@@ -98,6 +143,9 @@ export function buildPiArgs(input: BuildPiArgsInput): BuildPiArgsResult {
 		args.push(input.systemPromptMode === "replace" ? "--system-prompt" : "--append-system-prompt", promptPath);
 	}
 
+	// ------------------------------------------------------------------
+	// Task
+	// ------------------------------------------------------------------
 	if (input.task.length > TASK_ARG_LIMIT) {
 		if (!tempDir) {
 			tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagent-"));
@@ -109,13 +157,36 @@ export function buildPiArgs(input: BuildPiArgsInput): BuildPiArgsResult {
 		args.push(`Task: ${input.task}`);
 	}
 
+	// ------------------------------------------------------------------
+	// Environment
+	// ------------------------------------------------------------------
 	const env: Record<string, string | undefined> = {};
 	env.PI_SUBAGENT_INHERIT_PROJECT_CONTEXT = input.inheritProjectContext ? "1" : "0";
 	env.PI_SUBAGENT_INHERIT_SKILLS = input.inheritSkills ? "1" : "0";
-	if (input.mcpDirectTools?.length) {
-		env.MCP_DIRECT_TOOLS = input.mcpDirectTools.join(",");
+
+	// MCP_DIRECT_TOOLS + subagent MCP gating: three cases
+	if (mcpAccess.kind === "specific") {
+		// Case B: explicit env specs (visible → server/tool format)
+		const envSpecs = mcpAccess.specs.map(visibleToolToEnvSpec);
+		env.MCP_DIRECT_TOOLS = envSpecs.join(",");
+		env.PI_SUBAGENT_MCP_MODE = "specific";
+	} else if (mcpAccess.kind === "all") {
+		// Case C: do NOT set MCP_DIRECT_TOOLS (let pi-mcp-adapter use config-defined directTools)
+		// env.MCP_DIRECT_TOOLS remains undefined
+		env.PI_SUBAGENT_MCP_MODE = "all";
 	} else {
+		// Case A: no MCP — explicitly disable direct tools and all MCP
 		env.MCP_DIRECT_TOOLS = "__none__";
+		env.PI_SUBAGENT_MCP_MODE = "none";
+	}
+
+	// Child result artifact env vars (deterministic subagent result contract)
+	if (input.childResultPath) {
+		env.PI_SUBAGENT_CHILD = "1";
+		env.PI_SUBAGENT_RESULT_PATH = input.childResultPath;
+		env.PI_OFFLINE = "1";
+		env.PI_SUBAGENT_DISABLE_SCHEDULER = "1";
+		env.PI_OBSERVATIONAL_MEMORY_PASSIVE = "1";
 	}
 
 	return { args, env, tempDir };

@@ -89,6 +89,20 @@ export default function mcpAdapter(pi: ExtensionAPI) {
 
   // --- session_start: initialize MCP, register all tools, wire ToolSearch ---
   pi.on("session_start", async (_event, ctx) => {
+    // ------------------------------------------------------------------
+    // Subagent child-mode MCP control
+    // PI_SUBAGENT_MCP_MODE controls whether tool registration and ToolSearch
+    // are active in child subagent sessions:
+    //   none     = skip ALL MCP initialization (no servers, no tools, no ToolSearch)
+    //   specific = init MCP so early direct tools work, but skip catalog +
+    //              ToolSearch + setActiveTools (only MCP_DIRECT_TOOLS tools active)
+    //   all/unset = normal behavior (full catalog + ToolSearch + config direct tools)
+    // ------------------------------------------------------------------
+    const subagentMcpMode = process.env.PI_SUBAGENT_MCP_MODE;
+    if (subagentMcpMode === "none") {
+      return; // Skip ALL MCP initialization for this session
+    }
+
     const generation = ++lifecycleGeneration;
     const previousState = state;
     state = null;
@@ -107,6 +121,8 @@ export default function mcpAdapter(pi: ExtensionAPI) {
     const promise = initializeMcp(pi, ctx);
     initPromise = promise;
 
+    const isSpecificMode = subagentMcpMode === "specific";
+
     promise.then(async (nextState) => {
       if (generation !== lifecycleGeneration || initPromise !== promise) {
         try {
@@ -120,6 +136,12 @@ export default function mcpAdapter(pi: ExtensionAPI) {
       state = nextState;
       setMcpState(nextState);
       initPromise = null;
+
+      // In specific mode, only init state so early direct tools work.
+      // Do NOT register the full catalog, ToolSearch, or call setActiveTools.
+      if (isSpecificMode) {
+        return;
+      }
 
       // Non-null local reference for callbacks (TS narrows from closure)
       const s = state;

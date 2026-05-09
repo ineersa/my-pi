@@ -8,10 +8,7 @@ File: `~/.pi/agent/extensions/subagent/config.json`
 {
   "parallel": { "maxTasks": 12, "concurrency": 6 },
   "defaultSessionDir": "~/.pi/agent/sessions/subagent/",
-  "maxSubagentDepth": 2,
-  "intercomBridge": { "mode": "always", "instructionFile": "./intercom-bridge.md" },
-  "worktreeSetupHook": "./scripts/setup-worktree.mjs",
-  "worktreeSetupHookTimeoutMs": 30000
+  "maxSubagentDepth": 2
 }
 ```
 
@@ -20,11 +17,7 @@ File: `~/.pi/agent/extensions/subagent/config.json`
 | `parallel.maxTasks` | 8 | Max parallel tasks |
 | `parallel.concurrency` | 4 | Default concurrency |
 | `defaultSessionDir` | auto | Session log directory fallback |
-| `maxSubagentDepth` | 2 | Nesting limit. Per-agent can tighten but not relax. Env `PI_SUBAGENT_MAX_DEPTH` wins. |
-| `intercomBridge.mode` | "always" | "always" (fresh+fork), "fork" only, or omit to disable |
-| `intercomBridge.instructionFile` | default | Custom markdown template, supports `{orchestratorTarget}` placeholder |
-| `worktreeSetupHook` | - | Script path (absolute or repo-relative). stdin JSON → stdout JSON |
-| `worktreeSetupHookTimeoutMs` | 30000 | Per-worktree hook timeout |
+| `maxSubagentDepth` | 2 | Nesting limit; env `PI_SUBAGENT_MAX_DEPTH` wins; per-agent can tighten but not relax |
 
 ## Recursion Guard
 
@@ -40,35 +33,40 @@ Set `PI_SUBAGENT_MAX_DEPTH` before starting `pi`. Per-agent `maxSubagentDepth` i
 
 ## Artifacts
 
-Location: `{sessionDir}/subagent-artifacts/` or `<tmpdir>/pi-subagents-<scope>/artifacts/`
+Location: `{sessionDir}/subagent-artifacts/`
 
-Per task:
+Per run (sync only — no async jobs):
+
 - `{runId}_{agent}_input.md` — Task prompt
 - `{runId}_{agent}_output.md` — Full output (untruncated)
-- `{runId}_{agent}.jsonl` — Event stream (sync only)
-- `{runId}_{agent}_meta.json` — Timing, usage, exit code, model, fallback attempts
+- `{runId}_{agent}_meta.json` — Timing, usage, exit code, model, model fallback attempts
 
-## Chain Directory
+Artifacts are enabled by default (`artifacts: true`) and auto-cleaned after 7 days on extension load.
 
-`<tmpdir>/pi-subagents-<scope>/chain-runs/{runId}/` containing:
-- `context.md` — Scout/context-builder output
-- `plan.md` — Planner output
-- `progress.md` — Worker/reviewer shared progress
-- `parallel-{stepIndex}/` — Subdirs for parallel step outputs (`0-{agent}/output.md`)
-- Additional files as written by agents
+## Child Result Deterministic Contract
 
-Auto-cleaned after 24 hours on extension startup.
+Each spawned child process writes a JSON result artifact before exiting:
 
-## Async Observability
+```
+<tmpdir>/child-result-<runId>-attempt-<N>.json
+```
 
-`<tmpdir>/pi-subagents-<scope>/async-subagent-runs/<id>/`:
-- `status.json` — Source of truth for async progress (written atomically)
-- `events.jsonl` — Live event stream with subagent metadata
-- `output-<n>.log` — Human-readable tail for current step
-- `subagent-log-<id>.md` — Written on completion
+The parent reads this artifact as the **authoritative** result. If the artifact is missing (child never wrote it), the run is classified as failed regardless of process exit code.
+
+This replaces the old heuristic error detection that scanned assistant text for keywords like "error" or "failed".
 
 ## Session Logs
 
-JSONL session files per run. Directory precedence: `sessionDir` param → `config.defaultSessionDir` → parent-session-derived path.
+Session directory precedence: `sessionDir` param → `config.defaultSessionDir` → temp directory.
 
-With `context: "fork"`, each child starts from `--session <branched-file>` — real session fork, not injected summary.
+With `context: "fork"`, the task is wrapped with a fork-oriented preamble — it does **not** create a branched session file. With `context: "fresh"` (default), the child starts with only its task prompt.
+
+## Removed Features
+
+These config keys and behaviors no longer exist:
+
+- `intercomBridge` — intercom/parent-child coordination removed
+- `worktreeSetupHook` / `worktreeSetupHookTimeoutMs` — worktree isolation removed
+- Async observability paths (`async-subagent-runs/`) — background execution removed
+- Chain directories (`chain-runs/`) — chain execution removed
+- `subagent-log-<id>.md` completion files — no async jobs

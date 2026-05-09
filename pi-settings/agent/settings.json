@@ -21,8 +21,8 @@
   ],
   "hideThinkingBlock": true,
   "observational-memory": {
-    "observationThresholdTokens": 2000,
-    "compactionThresholdTokens": 60000,
+    "observationThresholdTokens": 1000,
+    "compactionThresholdTokens": 50000,
     "reflectionThresholdTokens": 30000,
     "passive": false,
     "compactionModel": {
@@ -32,7 +32,7 @@
   },
   "compaction": {
     "enabled": true,
-    "keepRecentTokens": 25000,
+    "keepRecentTokens": 20000,
     "reserveTokens": 16384
   },
   "pi-fork": {

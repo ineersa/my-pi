@@ -2,6 +2,7 @@
  * Type definitions for the subagent extension
  */
 
+import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { Message } from "@mariozechner/pi-ai";
@@ -112,8 +113,6 @@ export interface Details {
 	mode: "single" | "parallel";
 	context?: "fresh" | "fork";
 	results: SingleResult[];
-	asyncId?: string;
-	asyncDir?: string;
 	progress?: AgentProgress[];
 	progressSummary?: ProgressSummary;
 	artifacts?: {
@@ -194,7 +193,6 @@ export interface RunSyncOptions {
 	sessionDir?: string;
 	sessionFile?: string;
 	share?: boolean;
-	outputPath?: string;
 	maxSubagentDepth?: number;
 	/** Override the agent's default model (format: "provider/id" or just "id") */
 	modelOverride?: string;
@@ -216,6 +214,58 @@ export interface ExtensionConfig {
 	maxSubagentDepth?: number;
 	parallel?: TopLevelParallelConfig;
 }
+
+// ============================================================================
+// Child Result (deterministic artifact contract)
+// ============================================================================
+
+/**
+ * Result artifact written by the subagent child process via agent_end hook.
+ * Mirrors ForkResult pattern. Parent reads this as the authoritative result.
+ */
+export interface SubagentChildResult {
+	task: string;
+	exitCode: number;
+	messages: Message[];
+	usage: Usage;
+	model?: string;
+	provider?: string;
+	stopReason?: string;
+	finalOutput?: string;
+	sawAgentEnd: boolean;
+}
+
+/**
+ * Read a SubagentChildResult artifact from disk. Returns null if invalid/missing.
+ */
+export function readChildResult(resultPath: string): SubagentChildResult | null {
+	try {
+		if (!fs.existsSync(resultPath)) return null;
+		const raw = fs.readFileSync(resultPath, "utf-8");
+		const parsed = JSON.parse(raw) as SubagentChildResult;
+		if (!parsed.sawAgentEnd) return null;
+		if (!Array.isArray(parsed.messages)) return null;
+		return parsed;
+	} catch {
+		return null;
+	}
+}
+
+// ============================================================================
+// MCP Access Semantics
+// ============================================================================
+
+/**
+ * Describes how an agent accesses MCP tools.
+ *
+ * - none:  no MCP tools available
+ * - all:   all MCP tools available via ToolSearch + configured direct tools
+ * - specific: only the listed MCP tools, made direct
+ */
+export type McpAccess =
+	| { kind: "none" }
+	| { kind: "all" }
+	| { kind: "specific"; specs: string[] }; // visible tool names e.g. "websearch__search"
 
 // ============================================================================
 // Constants

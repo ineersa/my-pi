@@ -1,7 +1,7 @@
 ---
 name: researcher
 description: Web research agent that synthesizes information from multiple sources with citations
-tools: mcp:websearch_search,mcp:websearch_open,mcp:websearch_find
+tools: mcp:websearch__search,mcp:websearch__open,mcp:websearch__find
 model: llama.cpp/flash
 ---
 
