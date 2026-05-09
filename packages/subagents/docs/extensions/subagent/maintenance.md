@@ -5,7 +5,8 @@ Entry: `index.ts`
 ## Safety checks before install
 
 - `package.json` must list only existing extension entries in `pi.extensions`
-- `package.json files[]` must include `docs`
+- `package.json pi.skills[]` must point at the bundled `./skills` directory when the package ships installable skills
+- `package.json files[]` must include `docs` and `skills` when those assets are shipped
 - `docs/ai-index.json` must match package name, version, and extension entry
 - `schemas.ts` and the tool description in `index.ts` must describe the same modes/options
 
@@ -24,7 +25,7 @@ Expected state:
 
 - no non-TS5097 TypeScript errors in `packages/subagents/`
 - docs validation passes
-- packed file list contains `index.ts`, runtime `.ts` files, `README.md`, and `docs/`
+- packed file list contains `index.ts`, runtime `.ts` files, `README.md`, `docs/`, and `skills/` when bundled skills are expected
 - installer can register `packages/subagents`
 
 ## Runtime surface
