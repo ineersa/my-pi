@@ -11,6 +11,10 @@
     "my-pi": "bin/my-pi.mjs",
     "my-pi-theme": "bin/theme.mjs"
   },
+  "scripts": {
+    "sync:agents": "node bin/sync-agents.mjs",
+    "prepack": "node bin/sync-agents.mjs"
+  },
   "files": [
     "bin",
     ".agents",

@@ -10,7 +10,6 @@ This fork keeps the parts used in `my-pi`:
 - skill injection and model fallback
 - recursion-depth guard
 - artifact/session capture
-- bundled `subagents` skill docs for Pi skill discovery/install
 
 Removed from this package:
 
@@ -92,7 +91,6 @@ Supported keys:
 - `docs/extensions/subagent/settings.md`
 - `docs/extensions/subagent/usage.md`
 - `docs/extensions/subagent/maintenance.md`
-- `skills/subagents/`
 
 ## Validation
 

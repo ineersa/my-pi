@@ -196,7 +196,7 @@ function run(pi, command, args, { label }) {
 			console.log("✓ (already installed)");
 			return true;
 		}
-		if (command === "remove" && (message.includes("not installed") || message.includes("not found") || message.includes("does not exist"))) {
+		if (command === "remove" && (message.includes("not installed") || message.includes("not found") || message.includes("does not exist") || message.includes("no matching package found"))) {
 			console.log("✓ (not installed)");
 			return true;
 		}
@@ -292,6 +292,10 @@ function getSourceAgentsDir(opts) {
 	return opts.source === "local"
 		? join(repoRoot, ".agents")
 		: join(scriptDir, "..", ".agents");
+}
+
+function getSourceSkillsDir(opts) {
+	return join(getSourceAgentsDir(opts), "skills");
 }
 
 function getAgentNameFromFile(file) {
@@ -776,7 +780,7 @@ async function main() {
 
 		if (existsSync(sourceAgentsDir)) {
 			const agentFiles = readdirSync(sourceAgentsDir).filter((f) => f.endsWith(".md"));
-			const skillsSourceDir = join(sourceAgentsDir, "skills");
+			const skillsSourceDir = getSourceSkillsDir(opts);
 			const hasSkills = existsSync(skillsSourceDir);
 			const skillDirs = hasSkills
 				? readdirSync(skillsSourceDir, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name)

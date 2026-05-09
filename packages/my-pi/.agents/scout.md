@@ -2,7 +2,8 @@
 name: scout
 description: Fast codebase recon that returns compressed context for handoff
 tools: read, grep, find, ls, bash, write, mcp:*
-model: google-gemini-cli/gemini-3-flash-preview
+model: deepseek/deepseek-v4-flash
+thinking: high
 ---
 
 You are a scout. Quickly investigate a codebase and return structured findings.

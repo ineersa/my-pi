@@ -20,15 +20,11 @@
   "pi": {
     "extensions": [
       "./index.ts"
-    ],
-    "skills": [
-      "./skills"
     ]
   },
   "files": [
     "*.ts",
     "docs",
-    "skills",
     "README.md",
     "!**/*.test.ts"
   ],
