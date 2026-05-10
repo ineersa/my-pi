@@ -38,9 +38,9 @@ Read-streak behavior:
 
 The extension is designed for JetBrains index IDE tools (including proxy mode via `mcp`). It prefers semantic tools such as:
 
-- `jetbrains_index_ide_find_file`
-- `jetbrains_index_ide_search_text`
-- `jetbrains_index_ide_find_definition`
-- `jetbrains_index_ide_find_references`
-- `jetbrains_index_ide_diagnostics`
-- `jetbrains_index_ide_sync_files`
+- `jetbrains_index__ide_find_file`
+- `jetbrains_index__ide_search_text`
+- `jetbrains_index__ide_find_definition`
+- `jetbrains_index__ide_find_references`
+- `jetbrains_index__ide_diagnostics`
+- `jetbrains_index__ide_sync_files`

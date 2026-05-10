@@ -22,56 +22,56 @@ function resolveToolName(activeTools: string[], candidates: string[]): string {
 
 export function buildSystemPromptPolicy(activeTools: string[]): string {
 	const findReferences = resolveToolName(activeTools, [
-		"jetbrains_index_ide_find_references",
+		"jetbrains_index__ide_find_references",
 		"ide_find_references",
 	]);
 	const findDefinition = resolveToolName(activeTools, [
-		"jetbrains_index_ide_find_definition",
+		"jetbrains_index__ide_find_definition",
 		"ide_find_definition",
 	]);
 	const findClass = resolveToolName(activeTools, [
-		"jetbrains_index_ide_find_class",
+		"jetbrains_index__ide_find_class",
 		"ide_find_class",
 	]);
 	const findFile = resolveToolName(activeTools, [
-		"jetbrains_index_ide_find_file",
+		"jetbrains_index__ide_find_file",
 		"ide_find_file",
 	]);
 	const searchText = resolveToolName(activeTools, [
-		"jetbrains_index_ide_search_text",
+		"jetbrains_index__ide_search_text",
 		"ide_search_text",
 	]);
 	const typeHierarchy = resolveToolName(activeTools, [
-		"jetbrains_index_ide_type_hierarchy",
+		"jetbrains_index__ide_type_hierarchy",
 		"ide_type_hierarchy",
 	]);
 	const callHierarchy = resolveToolName(activeTools, [
-		"jetbrains_index_ide_call_hierarchy",
+		"jetbrains_index__ide_call_hierarchy",
 		"ide_call_hierarchy",
 	]);
 	const findImplementations = resolveToolName(activeTools, [
-		"jetbrains_index_ide_find_implementations",
+		"jetbrains_index__ide_find_implementations",
 		"ide_find_implementations",
 	]);
 	const findSuperMethods = resolveToolName(activeTools, [
-		"jetbrains_index_ide_find_super_methods",
+		"jetbrains_index__ide_find_super_methods",
 		"ide_find_super_methods",
 	]);
 	const refactorRename = resolveToolName(activeTools, [
-		"jetbrains_index_ide_refactor_rename",
+		"jetbrains_index__ide_refactor_rename",
 		"ide_refactor_rename",
 	]);
-	const moveFile = resolveToolName(activeTools, ["jetbrains_index_ide_move_file", "ide_move_file"]);
+	const moveFile = resolveToolName(activeTools, ["jetbrains_index__ide_move_file", "ide_move_file"]);
 	const diagnostics = resolveToolName(activeTools, [
-		"jetbrains_index_ide_diagnostics",
+		"jetbrains_index__ide_diagnostics",
 		"ide_diagnostics",
 	]);
 	const indexStatus = resolveToolName(activeTools, [
-		"jetbrains_index_ide_index_status",
+		"jetbrains_index__ide_index_status",
 		"ide_index_status",
 	]);
 	const syncFiles = resolveToolName(activeTools, [
-		"jetbrains_index_ide_sync_files",
+		"jetbrains_index__ide_sync_files",
 		"ide_sync_files",
 	]);
 
@@ -134,19 +134,19 @@ export function buildSystemPromptPolicy(activeTools: string[]): string {
 
 export function buildSessionStartIdeNudge(activeTools: string[]): string {
 	const findFile = resolveToolName(activeTools, [
-		"jetbrains_index_ide_find_file",
+		"jetbrains_index__ide_find_file",
 		"ide_find_file",
 	]);
 	const searchText = resolveToolName(activeTools, [
-		"jetbrains_index_ide_search_text",
+		"jetbrains_index__ide_search_text",
 		"ide_search_text",
 	]);
 	const findDefinition = resolveToolName(activeTools, [
-		"jetbrains_index_ide_find_definition",
+		"jetbrains_index__ide_find_definition",
 		"ide_find_definition",
 	]);
 	const findReferences = resolveToolName(activeTools, [
-		"jetbrains_index_ide_find_references",
+		"jetbrains_index__ide_find_references",
 		"ide_find_references",
 	]);
 
@@ -160,11 +160,11 @@ export function buildSessionStartIdeNudge(activeTools: string[]): string {
 
 export function buildReadEfficiencyReminder(activeTools: string[], reasons: string[]): string {
 	const findFile = resolveToolName(activeTools, [
-		"jetbrains_index_ide_find_file",
+		"jetbrains_index__ide_find_file",
 		"ide_find_file",
 	]);
 	const searchText = resolveToolName(activeTools, [
-		"jetbrains_index_ide_search_text",
+		"jetbrains_index__ide_search_text",
 		"ide_search_text",
 	]);
 
@@ -178,7 +178,7 @@ export function buildReadEfficiencyReminder(activeTools: string[], reasons: stri
 
 export function buildMoveRefactorReminder(activeTools: string[], commandPreview: string): string {
 	const moveFile = resolveToolName(activeTools, [
-		"jetbrains_index_ide_move_file",
+		"jetbrains_index__ide_move_file",
 		"ide_move_file",
 	]);
 

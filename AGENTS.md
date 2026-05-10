@@ -119,18 +119,18 @@ Local dev flow:
 
 When working with this codebase:
 
-- **Prefer JetBrains IDE index MCP tools** (`jetbrains_index_ide_*`) for semantic code operations:
-  - Finding usages/references: use `jetbrains_index_ide_find_references` instead of grep
-  - Going to definition: use `jetbrains_index_ide_find_definition` instead of text search
-  - Finding classes/files: use `jetbrains_index_ide_find_class` and `jetbrains_index_ide_find_file`
-  - Searching exact words: use `jetbrains_index_ide_search_text` (use grep only for regex)
-  - Renaming symbols: use `jetbrains_index_ide_refactor_rename` instead of edit/sed replacements
-  - Moving code files: use `jetbrains_index_ide_move_file` instead of `mv`/`git mv`
-  - Hierarchy/call flow: use `jetbrains_index_ide_type_hierarchy`, `jetbrains_index_ide_call_hierarchy`, `jetbrains_index_ide_find_implementations`, `jetbrains_index_ide_find_super_methods`
+- **Prefer JetBrains IDE index MCP tools** (`jetbrains_index__ide_*`) for semantic code operations:
+  - Finding usages/references: use `jetbrains_index__ide_find_references` instead of grep
+  - Going to definition: use `jetbrains_index__ide_find_definition` instead of text search
+  - Finding classes/files: use `jetbrains_index__ide_find_class` and `jetbrains_index__ide_find_file`
+  - Searching exact words: use `jetbrains_index__ide_search_text` (use grep only for regex)
+  - Renaming symbols: use `jetbrains_index__ide_refactor_rename` instead of edit/sed replacements
+  - Moving code files: use `jetbrains_index__ide_move_file` instead of `mv`/`git mv`
+  - Hierarchy/call flow: use `jetbrains_index__ide_type_hierarchy`, `jetbrains_index__ide_call_hierarchy`, `jetbrains_index__ide_find_implementations`, `jetbrains_index__ide_find_super_methods`
     - For call hierarchy, set `direction` (`callers`/`callees`), tune `depth`, and use any project-scope/dependency-filter params exposed by the current tool schema
-  - Diagnostics/index/sync: use `jetbrains_index_ide_diagnostics`, `jetbrains_index_ide_index_status`, `jetbrains_index_ide_sync_files`
-- If IDE tools fail unexpectedly or results seem incomplete, check `jetbrains_index_ide_index_status`
-- After creating/modifying files with `edit`/`write`, run `jetbrains_index_ide_sync_files` on changed paths before retrying IDE queries
+  - Diagnostics/index/sync: use `jetbrains_index__ide_diagnostics`, `jetbrains_index__ide_index_status`, `jetbrains_index__ide_sync_files`
+- If IDE tools fail unexpectedly or results seem incomplete, check `jetbrains_index__ide_index_status`
+- After creating/modifying files with `edit`/`write`, run `jetbrains_index__ide_sync_files` on changed paths before retrying IDE queries
 - Use project-relative file paths and 1-based `line`/`column` for IDE tool calls
 - Prefer pagination via `cursor`/`nextCursor` for `find_file`, `find_class`, `search_text`, `find_references`, and `find_implementations` instead of broad fallback scans
 - When JetBrains MCP gets updated, trust live `mcp describe` schemas over cached assumptions in prompts/skills

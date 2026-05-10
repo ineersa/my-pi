@@ -331,7 +331,7 @@ export default function jetbrainsIndexExtension(pi: ExtensionAPI): void {
 			reminders.push(wrapSystemReminder([
 				"JetBrains index is available in this session.",
 				"- Prefer IDE semantic tools first before broad read/grep/bash exploration.",
-				"- Start with jetbrains_index_ide_find_file, jetbrains_index_ide_search_text, jetbrains_index_ide_find_definition, and jetbrains_index_ide_find_references.",
+				"- Start with jetbrains_index__ide_find_file, jetbrains_index__ide_search_text, jetbrains_index__ide_find_definition, and jetbrains_index__ide_find_references.",
 				"- Keep reads focused with offset/limit windows.",
 			].join("\n")));
 		}
