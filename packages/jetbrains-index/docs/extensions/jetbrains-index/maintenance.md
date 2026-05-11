@@ -22,12 +22,14 @@ Core implementation files:
 - `extensions/jetbrains-index/tools/diagnostics.ts` — `createDiagnostics` (ide_diagnostics)
 - `extensions/jetbrains-index/tools/move-file.ts` — `createMoveFile` (ide_move_file)
 - `extensions/jetbrains-index/tools/file-structure.ts` — `createFileStructure` (ide_file_structure)
-- `extensions/jetbrains-index/jetbrains-service.ts` — generic JetBrains MCP service layer (transport, catalog, retries, TOON helpers, MCP tool metadata)
+- `extensions/jetbrains-index/jetbrains-service.ts` — generic JetBrains MCP service layer (transport, catalog, indexing lifecycle, retries, MCP tool metadata)
+- `extensions/jetbrains-index/response-formatting.ts` — standalone pure functions for TOON encoding, MCP payload decoding, and error formatting (extracted from JetBrainsService)
 - `extensions/jetbrains-index/target-resolver.ts` — target-resolution layer: resolves symbol/location inputs to canonical file/line/column for semantic wrapper tools
 - `extensions/jetbrains-index/problems-tracker.ts` — pre/post mutation diagnostics lifecycle, uses JetBrainsService
 - `extensions/jetbrains-index/settings-config.ts` — loads JetBrains connection config from Pi settings.json (with mcp.json fallback)
 - `extensions/jetbrains-index/prompts.ts` — minimal IDE prompt and reminder builders
 - `extensions/jetbrains-index/diagnostics.ts` — diagnostics type definitions and formatting
+- `extensions/jetbrains-index/diagnostics-protocol.ts` — shared preflight protocol (open file → sync → wait for index) used by ProblemsTracker and the `ide_diagnostics` wrapper
 - `extensions/jetbrains-index/constants.ts` — thresholds, cooldowns, retry timings
 - `extensions/jetbrains-index/docs/archive/legacy-strict-policy.txt` — archived old strict policy
 
@@ -54,8 +56,12 @@ jetbrains-index.ts                 ← entry point, hooks, tool registration
   │    ├─ tools/file-structure.ts   ← ide_file_structure
   │    └─ tools/
   ├─ target-resolver.ts             ← symbol → file/line/column resolution
-  ├─ jetbrains-service.ts           ← MCP client (17-tool catalog, TOON, metadata)
+  ├─ jetbrains-service.ts           ← MCP client (transport, catalog, indexing lifecycle)
   │    └─ settings-config.ts        ← config loader
+  ├─ response-formatting.ts         ← TOON/payload/error helpers (pure functions)
+  │    (used by tools via callTool and shared helpers)
+  ├─ diagnostics-protocol.ts        ← shared diagnostics preflight (open → sync → wait)
+  │    shared by ProblemsTracker and tools/diagnostics.ts
   └─ problems-tracker.ts
        └─ jetbrains-service.ts
 ```

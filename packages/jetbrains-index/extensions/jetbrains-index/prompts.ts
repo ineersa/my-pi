@@ -1,7 +1,3 @@
-export function wrapSystemReminder(content: string): string {
-	return `<system-reminder>\n${content}\n</system-reminder>`;
-}
-
 function resolveToolName(activeTools: string[], candidates: string[]): string {
 	const activeSet = new Set(activeTools);
 	for (const candidate of candidates) {
@@ -25,7 +21,6 @@ function resolveToolName(activeTools: string[], candidates: string[]): string {
  */
 export function buildMoveRefactorReminder(activeTools: string[], commandPreview: string): string {
 	const moveFile = resolveToolName(activeTools, [
-		"jetbrains_index__ide_move_file",
 		"ide_move_file",
 	]);
 

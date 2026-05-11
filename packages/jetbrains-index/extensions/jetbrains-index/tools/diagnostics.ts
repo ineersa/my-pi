@@ -4,6 +4,8 @@
 import { Type } from "@sinclair/typebox";
 import { StringEnum } from "@mariozechner/pi-ai";
 import { JetBrainsService } from "../jetbrains-service.js";
+import { prepareFileForDiagnostics } from "../diagnostics-protocol.js";
+import { toToon, makeError } from "../response-formatting.js";
 import { callTool } from "./shared.js";
 import type { ToolRegistration } from "./types.js";
 
@@ -30,22 +32,17 @@ export function createDiagnostics(service: JetBrainsService): ToolRegistration {
 
 			const file = typeof p.file === "string" ? p.file.trim() : "";
 			if (!file) {
-				const payload = service.makeError(
+				const payload = makeError(
 					"file is required and must be a non-empty string.",
 					"Provide a valid project-relative file path.",
 					false,
 				);
-				return { content: [{ type: "text", text: service.toToon(payload) }], isError: true };
+				return { content: [{ type: "text", text: toToon(payload) }], isError: true };
 			}
 
-			// Best-effort open file in IDE
-			await service.openFile(file);
-
-			// Sync changed paths
-			await service.syncFiles([file]);
-
-			// Wait for index
-			await service.waitForIndexReady();
+			// Run diagnostics preflight protocol (best-effort — we try the
+			// diagnostics call even if preflight partially fails)
+			await prepareFileForDiagnostics(service, file);
 
 			// Build args for diagnostics call
 			const args: Record<string, unknown> = { file };

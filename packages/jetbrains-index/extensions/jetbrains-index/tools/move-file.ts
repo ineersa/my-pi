@@ -4,6 +4,7 @@
  */
 import { Type } from "@sinclair/typebox";
 import { JetBrainsService } from "../jetbrains-service.js";
+import { toToon, makeError } from "../response-formatting.js";
 import { callTool, withMutationLock } from "./shared.js";
 import type { ToolRegistration } from "./types.js";
 
@@ -40,20 +41,20 @@ export function createMoveFile(service: JetBrainsService): ToolRegistration {
 		async execute(_id, params, _signal, _onUpdate, _ctx) {
 			const p = params as { file: string; destination: string };
 			if (typeof p.file !== "string" || !p.file.trim()) {
-				const payload = service.makeError(
+				const payload = makeError(
 					"file is required.",
 					"Provide the project-relative file path to move.",
 					false,
 				);
-				return { content: [{ type: "text", text: service.toToon(payload) }], isError: true };
+				return { content: [{ type: "text", text: toToon(payload) }], isError: true };
 			}
 			if (typeof p.destination !== "string" || !p.destination.trim()) {
-				const payload = service.makeError(
+				const payload = makeError(
 					"destination is required.",
 					"Provide the destination directory path.",
 					false,
 				);
-				return { content: [{ type: "text", text: service.toToon(payload) }], isError: true };
+				return { content: [{ type: "text", text: toToon(payload) }], isError: true };
 			}
 			const backendArgs = { file: p.file, destination: p.destination };
 			return withMutationLock(async () => {

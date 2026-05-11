@@ -47,7 +47,7 @@ export function createReferences(service: JetBrainsService): ToolRegistration {
 		name: "ide_find_references",
 		label: "Find References (IDE)",
 		description: toolDescription,
-		promptSnippet: "Find all usages/references of a symbol via the IDE index",
+		promptSnippet: "Impact analysis: find all usages/references before changing or judging a symbol.",
 		parameters: params,
 		async execute(_id, params, _signal, _onUpdate, ctx) {
 			const p = params as Record<string, unknown>;

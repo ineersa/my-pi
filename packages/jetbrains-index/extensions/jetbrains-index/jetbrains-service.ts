@@ -7,7 +7,6 @@
  */
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { encode as toonEncode } from "@toon-format/toon";
 import {
 	IDE_INDEX_STATUS_LAST_ATTEMPT_TIMEOUT_MS,
 	IDE_INDEX_STATUS_MAX_RETRIES,
@@ -831,113 +830,6 @@ export class JetBrainsService {
 		}
 
 		return status;
-	}
-
-	// -----------------------------------------------------------------------
-	// Result encoding and MCP payload helpers (for wrapper tools)
-	// -----------------------------------------------------------------------
-
-	/**
-	 * Encode data as TOON text for model consumption.
-	 * Always TOON. Never JSON fallback. Strings pass through as-is.
-	 */
-	toToon(data: unknown): string {
-		if (typeof data === "string") return data;
-		if (typeof data !== "object" || data === null) {
-			return String(data);
-		}
-		try {
-			return toonEncode(data);
-		} catch {
-			return JSON.stringify(data);
-		}
-	}
-
-	/**
-	 * Extract text blocks from an MCP ToolResult content array.
-	 */
-	private extractMcpTextBlocks(result: unknown): string[] {
-		const rec = asRecord(result);
-		if (!rec) return [];
-		const content = rec.content;
-		if (!Array.isArray(content)) return [];
-		const texts: string[] = [];
-		for (const block of content) {
-			const b = asRecord(block);
-			if (b?.type === "text" && typeof b.text === "string") {
-				texts.push(b.text);
-			}
-		}
-		return texts;
-	}
-
-	/**
-	 * Check whether an MCP ToolResult indicates an error.
-	 */
-	isMcpError(result: unknown): boolean {
-		const rec = asRecord(result);
-		return rec?.isError === true;
-	}
-
-	/**
-	 * Extract the first meaningful error text from an MCP error result.
-	 */
-	getMcpErrorText(result: unknown): string | undefined {
-		const texts = this.extractMcpTextBlocks(result);
-		return texts.length > 0 ? texts.join("\n") : undefined;
-	}
-
-	/**
-	 * Decode the actual data payload from a JetBrains MCP tool result.
-	 *
-	 * The MCP backend wraps data in content blocks:
-	 *   { content: [{ type: "text", text: "<JSON string>" }], isError: false }
-	 *
-	 * This helper extracts content[0].text, JSON-decodes if the text is JSON,
-	 * and returns the decoded data. Multiple blocks are decoded individually.
-	 * Falls back to the raw result object if no text blocks are found.
-	 */
-	decodeMcpPayload(result: unknown): unknown {
-		const texts = this.extractMcpTextBlocks(result);
-		if (texts.length === 0) {
-			// No text blocks found — return the raw result as fallback
-			return result;
-		}
-
-		if (texts.length === 1) {
-			const parsed = parseJson(texts[0]);
-			return parsed ?? texts[0];
-		}
-
-		// Multiple text blocks — decode each individually
-		return texts.map((t) => {
-			const parsed = parseJson(t);
-			return parsed ?? t;
-		});
-	}
-
-	/**
-	 * Encode data as TOON text for model consumption.
-	 * Always returns TOON; falls back to JSON only if encoding throws.
-	 *
-	 * @deprecated Use toToon() + decodeMcpPayload() instead.
-	 */
-	toonOrJson(data: unknown): string {
-		if (typeof data !== "object" || data === null) {
-			return JSON.stringify(data);
-		}
-		try {
-			return toonEncode(data);
-		} catch {
-			return JSON.stringify(data, null, 2);
-		}
-	}
-
-	/**
-	 * Build a standard error object for MCP tool failures.
-	 */
-	makeError(error: string, hint: string, isRetryable: boolean): Record<string, unknown> {
-		return { error, hint, isRetryable };
 	}
 
 	// -----------------------------------------------------------------------

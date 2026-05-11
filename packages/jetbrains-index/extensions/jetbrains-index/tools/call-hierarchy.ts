@@ -56,7 +56,7 @@ export function createCallHierarchy(service: JetBrainsService): ToolRegistration
 		name: "ide_call_hierarchy",
 		label: "Call Hierarchy (IDE)",
 		description: toolDescription,
-		promptSnippet: "Show callers or callees for a function/method via the IDE index",
+		promptSnippet: "Trace callers/callees for code review, blast radius, and implementation internals.",
 		parameters: params,
 		async execute(_id, params, _signal, _onUpdate, ctx) {
 			const p = params as Record<string, unknown>;

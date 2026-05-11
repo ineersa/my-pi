@@ -3,6 +3,7 @@
  */
 import { Type } from "@sinclair/typebox";
 import { JetBrainsService } from "../jetbrains-service.js";
+import { toToon, makeError } from "../response-formatting.js";
 import { callTool, resolveAndMerge, TargetParams, withMutationLock } from "./shared.js";
 import type { ToolResult, ToolRegistration } from "./types.js";
 
@@ -41,8 +42,8 @@ export function createRenameSymbol(service: JetBrainsService): ToolRegistration 
 			const p = params as Record<string, unknown>;
 			const newName = p.newName;
 			if (typeof newName !== "string" || !newName.trim()) {
-				const payload = service.makeError("newName is required.", "Provide the new name for the symbol.", false);
-				return { content: [{ type: "text", text: service.toToon(payload) }], isError: true };
+				const payload = makeError("newName is required.", "Provide the new name for the symbol.", false);
+				return { content: [{ type: "text", text: toToon(payload) }], isError: true };
 			}
 			const merged = await resolveAndMerge(service, p, ctx.cwd, { newName });
 			if ("content" in merged) return merged as ToolResult;

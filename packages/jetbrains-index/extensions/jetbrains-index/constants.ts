@@ -1,14 +1,3 @@
-/** Symbolic/generic tool detection — kept for tool-names.ts compatibility. */
-export const BUILTIN_GENERIC_TOOLS = new Set<string>(["read", "grep", "find", "ls", "bash"]);
-export const GENERIC_SUFFIXES = new Set<string>();
-export const SYMBOLIC_SUFFIXES = new Set<string>([
-	"search_symbol",
-	"get_symbol_info",
-	"search_structural",
-	"rename_refactoring",
-]);
-export const SEARCH_BASH_REGEX = /\b(?:rg|grep|git\s+grep|find)\b/i;
-
 /** Detect shell move commands to nudge toward IDE move refactoring. */
 export const MOVE_BASH_REGEX = /(^|[;&|]\s*|\s+)(?:git\s+mv|mv)(?=\s|$)/i;
 

@@ -3,6 +3,7 @@ import { isAbsolute, relative, resolve, sep } from "node:path";
 import { areDiagnosticsEqual, type Diagnostic, type DiagnosticFile } from "./diagnostics.js";
 import { loadJetBrainsConfig } from "./settings-config.js";
 import { JetBrainsService } from "./jetbrains-service.js";
+import { prepareFileForDiagnostics } from "./diagnostics-protocol.js";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -275,18 +276,11 @@ export class ProblemsTracker {
 				continue;
 			}
 
-			// Open file in IDE first (best-effort)
-			await this.service.openFile(pending.relativePath);
-
-			const synced = await this.service.syncFiles([pending.relativePath]);
-			if (!synced) {
-				continue;
-			}
-
-			const readiness = await this.service.waitForIndexReady();
-			if (!readiness.ready) {
+			// Run shared diagnostics preflight protocol
+			const preflight = await prepareFileForDiagnostics(this.service, pending.relativePath);
+			if (!preflight.ready) {
 				this.notify(
-					`Skipped diagnostics for ${pending.relativePath}: ${readiness.message ?? "IDE index is not ready."}`,
+					`Skipped diagnostics for ${pending.relativePath}: ${preflight.message}`,
 					"error",
 				);
 				continue;

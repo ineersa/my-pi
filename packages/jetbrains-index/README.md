@@ -97,8 +97,6 @@ jetbrains-index.ts       ← entry point, hooks, tool registration
 ├── prompts.ts            ← minimal IDE prompt + reminder builders
 ├── diagnostics.ts        ← diagnostics summary formatting
 ├── constants.ts          ← thresholds, cooldowns, regexes
-├── capabilities.ts       ← detect available IDE tools (dead code, kept for typecheck)
-└── tool-names.ts         ← tool name resolution (dead code, kept for typecheck)
 ```
 
 Each tool lives in its own file under `tools/`. Each file owns its registration,

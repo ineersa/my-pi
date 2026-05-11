@@ -4,6 +4,7 @@
 import { Type } from "@sinclair/typebox";
 import { StringEnum } from "@mariozechner/pi-ai";
 import { JetBrainsService } from "../jetbrains-service.js";
+import { toToon, makeError } from "../response-formatting.js";
 import { getParamDesc, callTool } from "./shared.js";
 import type { ToolRegistration } from "./types.js";
 
@@ -71,12 +72,12 @@ export function createFindSymbol(service: JetBrainsService): ToolRegistration {
 				return callTool(service, "findClass", query);
 			}
 
-			const payload = service.makeError(
+			const payload = makeError(
 				"No symbol search backend available.",
 				"Enable findSymbol or findClass in the JetBrains IDE plugin.",
 				false,
 			);
-			return { content: [{ type: "text", text: service.toToon(payload) }], isError: true };
+			return { content: [{ type: "text", text: toToon(payload) }], isError: true };
 		},
 	};
 }

@@ -44,7 +44,7 @@ export function createTypeHierarchy(service: JetBrainsService): ToolRegistration
 		name: "ide_type_hierarchy",
 		label: "Type Hierarchy (IDE)",
 		description: toolDescription,
-		promptSnippet: "Show type hierarchy (supertypes/subtypes) via the IDE index",
+		promptSnippet: "Inspect inheritance, supertypes/subtypes, and implementors for architecture review.",
 		parameters: params,
 		async execute(_id, params, _signal, _onUpdate, ctx) {
 			const p = params as Record<string, unknown>;

@@ -50,7 +50,7 @@ export function createImplementations(service: JetBrainsService): ToolRegistrati
 		name: "ide_find_implementations",
 		label: "Find Implementations (IDE)",
 		description: toolDescription,
-		promptSnippet: "Find interface/abstract implementations via the IDE index",
+		promptSnippet: "Find concrete implementations of interfaces, abstract classes, traits, or abstract methods.",
 		parameters: params,
 		async execute(_id, params, _signal, _onUpdate, ctx) {
 			const p = params as Record<string, unknown>;

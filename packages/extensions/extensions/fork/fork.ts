@@ -24,11 +24,13 @@ import { loadConfig } from "./config.js";
 import { renderForkCall, renderForkResult } from "./render.js";
 import { runFork } from "./runner.js";
 import { getResultSummaryText } from "./runner-events.js";
+import { makeForkResult, parseSessionResult } from "./session-result.js";
 import {
   countRunningForks,
   createRun,
   completeRun,
   failRun,
+  getRunStatus,
   listRuns,
 } from "./status-store.js";
 import {
@@ -38,6 +40,17 @@ import {
   isResultError,
 } from "./types.js";
 import { killPane, paneExists } from "./tmux.js";
+
+const ForkRetrieveParams = Type.Object({
+  run_id: Type.String({
+    description:
+      "The run ID of the fork to retrieve results for (e.g. 'zqdlmbeoabc0'). Shown when the fork is launched.",
+  }),
+});
+
+interface ForkRetrieveToolParams {
+  run_id: string;
+}
 
 const ForkParams = Type.Object({
   task: Type.String({
@@ -412,6 +425,125 @@ export default function (pi: ExtensionAPI) {
   pi.on("session_shutdown", async (_event, ctx) => {
     ctx.ui.setStatus(FORK_COST_STATUS_KEY, undefined);
     cleanupRunningForks(ctx.cwd, ctx.sessionManager.getSessionFile());
+  });
+
+  // ── Fork retrieve tool ──────────────────────────────────────────
+
+  pi.registerTool({
+    name: "fork_retrieve",
+    label: "Fork Retrieve",
+    description:
+      "Retrieve the result artifact for a completed or failed fork run by its run ID. " +
+      "Use this when a fork's follow-up delivery was missed, corrupted, or when you need to re-read a fork's output. " +
+      "Returns the same summary text the fork would have produced on completion.",
+    parameters: ForkRetrieveParams as any,
+
+    async execute(_toolCallId, params: ForkRetrieveToolParams, _signal, _onUpdate, _ctx) {
+      const runId = params.run_id.trim();
+      if (!runId) {
+        return {
+          content: [{ type: "text" as const, text: "Error: run_id parameter is required." }],
+          details: {},
+          isError: true,
+        };
+      }
+
+      const status = getRunStatus(runId);
+      if (!status) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `No fork run found with ID '${runId}'. Check the ID and try again.`,
+            },
+          ],
+          details: {},
+          isError: true,
+        };
+      }
+
+      // Still running — can't retrieve yet
+      if (status.state === "running") {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Fork run '${runId}' is still running. Wait for it to complete before retrieving results.`,
+            },
+          ],
+          details: {},
+          isError: true,
+        };
+      }
+
+      // Try to read the result artifact from disk
+      const resultPath = status.resultPath;
+      if (!resultPath) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Fork run '${runId}' (state: ${status.state}) has no result artifact path recorded. The run may have been too old or the result was not persisted.`,
+            },
+          ],
+          details: {},
+          isError: true,
+        };
+      }
+
+      let resultJson: string;
+      try {
+        resultJson = fs.readFileSync(resultPath, "utf-8");
+      } catch {
+        // Result file missing — try session file fallback
+        if (status.sessionFile) {
+          try {
+            const parsed = parseSessionResult(status.sessionFile);
+            if (parsed && parsed.finalOutput) {
+              const forkResult = makeForkResult(status.task ?? "", parsed, status.exitCode ?? 1);
+              return {
+                content: [{ type: "text" as const, text: getResultSummaryText(forkResult) }],
+                details: makeDetails([forkResult]),
+              };
+            }
+          } catch {
+            // Session file also unreadable
+          }
+        }
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Fork run '${runId}' (state: ${status.state}) — result artifact not found at '${resultPath}'. ${status.error ? `Error: ${status.error}` : "The artifact file may have been cleaned up."}`,
+            },
+          ],
+          details: {},
+          isError: true,
+        };
+      }
+
+      let result: ForkResult;
+      try {
+        result = JSON.parse(resultJson) as ForkResult;
+      } catch {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Fork run '${runId}' — result artifact at '${resultPath}' is corrupted and cannot be parsed.`,
+            },
+          ],
+          details: {},
+          isError: true,
+        };
+      }
+
+      return {
+        content: [{ type: "text" as const, text: getResultSummaryText(result) }],
+        details: makeDetails([result]),
+      };
+    },
   });
 
   // ── Fork tool ──────────────────────────────────────────────────

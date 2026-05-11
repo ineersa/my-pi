@@ -6,6 +6,7 @@
  */
 import { Type } from "@sinclair/typebox";
 import { JetBrainsService } from "../jetbrains-service.js";
+import { toToon, makeError } from "../response-formatting.js";
 import { callTool, withMutationLock } from "./shared.js";
 import type { ToolRegistration } from "./types.js";
 
@@ -38,12 +39,12 @@ export function createRenameFile(service: JetBrainsService): ToolRegistration {
 		async execute(_id, params, _signal, _onUpdate, _ctx) {
 			const p = params as Record<string, unknown>;
 			if (typeof p.file !== "string" || !p.file.trim()) {
-				const payload = service.makeError("file is required.", "Provide the existing project-relative file path.", false);
-				return { content: [{ type: "text", text: service.toToon(payload) }], isError: true };
+				const payload = makeError("file is required.", "Provide the existing project-relative file path.", false);
+				return { content: [{ type: "text", text: toToon(payload) }], isError: true };
 			}
 			if (typeof p.newName !== "string" || !p.newName.trim()) {
-				const payload = service.makeError("newName is required.", "Provide the new file name.", false);
-				return { content: [{ type: "text", text: service.toToon(payload) }], isError: true };
+				const payload = makeError("newName is required.", "Provide the new file name.", false);
+				return { content: [{ type: "text", text: toToon(payload) }], isError: true };
 			}
 			return withMutationLock(async () => {
 				const result = await callTool(service, "rename", { file: p.file, newName: p.newName });

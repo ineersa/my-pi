@@ -17,7 +17,7 @@ export function createSuperMethods(service: JetBrainsService): ToolRegistration 
 		name: "ide_find_super_methods",
 		label: "Find Super Methods (IDE)",
 		description: getToolDesc(meta),
-		promptSnippet: "Find parent overridden/implemented methods via the IDE index",
+		promptSnippet: "Find parent overridden/implemented methods for override/interface analysis.",
 		parameters: params,
 		async execute(_id, params, _signal, _onUpdate, ctx) {
 			const merged = await resolveAndMerge(service, params as Record<string, unknown>, ctx.cwd, {});

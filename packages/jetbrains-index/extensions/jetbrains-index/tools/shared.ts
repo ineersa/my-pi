@@ -5,6 +5,7 @@ import { Type } from "@sinclair/typebox";
 import { StringEnum } from "@mariozechner/pi-ai";
 import { JetBrainsService, type JetBrainsToolKey, type MCPToolDefinition } from "../jetbrains-service.js";
 import { resolveTarget, type TargetInput } from "../target-resolver.js";
+import { toToon, makeError, isMcpError, getMcpErrorText, decodeMcpPayload } from "../response-formatting.js";
 import type { ToolResult } from "./types.js";
 
 // ---------------------------------------------------------------------------
@@ -23,7 +24,13 @@ import type { ToolResult } from "./types.js";
 export const IDE_PROMPT_GUIDELINES: readonly string[] = [
 	"Prefer IDE tools over bash/rg/find for code navigation and semantic operations in the current working directory.",
 	"Use ide_find_file, ide_find_symbol, ide_search_text, ide_file_structure, and ide_find_definition before broad filesystem reads or shell searches.",
-	"Use ide_find_references, ide_type_hierarchy, ide_find_implementations, ide_find_super_methods, and ide_call_hierarchy to understand usages, inheritance, implementations, overrides, and call flow.",
+
+	"Before answering code review, architecture, refactor-risk, or impact-analysis questions, gather IDE evidence instead of relying only on file reads.",
+	"Use ide_find_references before judging whether a symbol/API/function/class is safe to change or remove.",
+	"Use ide_call_hierarchy with direction:\"callers\" for blast radius and direction:\"callees\" for implementation internals when reviewing functions or methods.",
+	"Use ide_type_hierarchy and ide_find_implementations when reviewing classes, interfaces, inheritance, abstractions, or architecture.",
+	"Use ide_find_super_methods when reviewing overridden methods or interface/abstract method implementations.",
+
 	"Use ide_rename_symbol for renaming classes, methods, functions, fields, variables, and properties instead of raw edits or search/replace.",
 	"Use ide_rename_file and ide_move_file instead of mv/git mv for source files so imports, usages, references, and package/namespace information are updated.",
 	"IDE tools are only available for targets inside the current working directory.",
@@ -90,24 +97,24 @@ export async function callTool(
 
 		// Service-level transport/connectivity error
 		if (!call.ok) {
-			const payload = service.makeError(call.error ?? "Tool call failed", hint, isRetryable);
-			return { content: [{ type: "text", text: service.toToon(payload) }], isError: true };
+			const payload = makeError(call.error ?? "Tool call failed", hint, isRetryable);
+			return { content: [{ type: "text", text: toToon(payload) }], isError: true };
 		}
 
 		// MCP-level error (backend returned isError: true, e.g. "No class/type found")
-		if (service.isMcpError(call.result)) {
-			const errorText = service.getMcpErrorText(call.result) ?? "IDE tool returned an error";
-			const payload = service.makeError(errorText, hint, isRetryable);
-			return { content: [{ type: "text", text: service.toToon(payload) }], isError: true };
+		if (isMcpError(call.result)) {
+			const errorText = getMcpErrorText(call.result) ?? "IDE tool returned an error";
+			const payload = makeError(errorText, hint, isRetryable);
+			return { content: [{ type: "text", text: toToon(payload) }], isError: true };
 		}
 
 		// Success: decode the actual data payload from MCP content blocks
-		const payload = service.decodeMcpPayload(call.result);
-		return { content: [{ type: "text", text: service.toToon(payload) }] };
+		const payload = decodeMcpPayload(call.result);
+		return { content: [{ type: "text", text: toToon(payload) }] };
 	} catch (error) {
 		const msg = error instanceof Error ? error.message : String(error);
-		const payload = service.makeError(msg, hint, isRetryable);
-		return { content: [{ type: "text", text: service.toToon(payload) }], isError: true };
+		const payload = makeError(msg, hint, isRetryable);
+		return { content: [{ type: "text", text: toToon(payload) }], isError: true };
 	}
 }
 
@@ -134,12 +141,12 @@ export async function resolveAndMerge(
 	const hasSymbol = !!targetInput.symbol;
 
 	if (!hasFullLocation && !hasSymbol) {
-		const payload = service.makeError(
+		const payload = makeError(
 			"Provide file+line+column, or symbol.",
 			"Use file+line+column when known; otherwise provide symbol.",
 			false,
 		);
-		return { content: [{ type: "text", text: service.toToon(payload) }], isError: true };
+		return { content: [{ type: "text", text: toToon(payload) }], isError: true };
 	}
 
 	if (hasFullLocation) {
@@ -147,7 +154,7 @@ export async function resolveAndMerge(
 		if (resolved.status === "ok") {
 			return { ...toolArgs, file: resolved.file, line: resolved.line, column: resolved.column };
 		}
-		return resolveErrorToResult(service, resolved);
+		return resolveErrorToResult(resolved);
 	}
 
 	// Symbol mode
@@ -155,19 +162,18 @@ export async function resolveAndMerge(
 	if (resolved.status === "ok") {
 		return { ...toolArgs, file: resolved.file, line: resolved.line, column: resolved.column };
 	}
-	return resolveErrorToResult(service, resolved);
+	return resolveErrorToResult(resolved);
 }
 
 function resolveErrorToResult(
-	service: JetBrainsService,
 	result: { status: string; summary: string; hint?: string },
 ): ToolResult {
-	const payload = service.makeError(
+	const payload = makeError(
 		result.summary,
 		result.hint ?? "Try file+line+column targeting instead.",
 		false,
 	);
-	return { content: [{ type: "text", text: service.toToon(payload) }], isError: true };
+	return { content: [{ type: "text", text: toToon(payload) }], isError: true };
 }
 
 // ---------------------------------------------------------------------------
