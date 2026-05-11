@@ -1,0 +1,62 @@
+=== Legacy strict IDE INDEX MCP POLICY ===
+Removed in stage 1 simplification (see maintenance.md for details).
+
+This was the previous large system-prompt injection with full task-to-tool
+mapping, pre-flight checks, read/search rules, parameter rules, and mistakes-
+to-avoid. It was replaced with a minimal three-line prompt.
+
+=== Original policy text (archived) ===
+
+IDE INDEX MCP POLICY (STRICT)
+
+Core rule:
+- Always prefer JetBrains IDE index tools for semantic code operations.
+- Do not use bash/grep/rg/find for usages/definitions/refactors when IDE tools are available.
+
+Trigger:
+- Apply this policy whenever JetBrains index MCP tools are available in the session.
+
+Task-to-tool mapping (IDE first):
+- Find all usages of a method/class/variable -> (tool). Never use grep; it misses aliases/import semantics/overrides.
+- Go to symbol definition -> (tool). Never use grep for definitions through imports/generics.
+- Find class by name -> (tool).
+- Find file by name -> (tool). Glob-style shell lookup is acceptable for simple file patterns if IDE lookup is unavailable.
+- Search exact word in code -> (tool). Use bash/rg only for regex needs (search is exact-word).
+- Rename symbol across project -> (tool). Never use text replace/sed/edit/write.
+- Move file/directory with references -> (tool). Never use mv/git mv for code moves.
+- Check errors/warnings -> (tool).
+- Understand class hierarchy -> (tool).
+- Find callers/callees -> (tool) (set direction="callers"|"callees", tune depth, and use any project-scope/dependency-filter params exposed by current schema).
+- Find interface/abstract implementations -> (tool).
+- Find overridden/implemented parent method -> (tool).
+
+Pre-flight and consistency checks:
+- If IDE tools fail unexpectedly or results look incomplete, check (tool).
+- If files changed outside the IDE view (edit/write), run (tool) on changed relative paths and retry.
+- Re-check live tool schema when MCP updates land; prefer current describe output over stale assumptions.
+
+Read/search rules:
+- Use (find_file) / (search_text) before broad reads when locating code.
+- Use bounded read windows (offset/limit) whenever possible.
+- Guardrail: after 4 consecutive large unbounded reads (>200 lines), you will get penalty.
+- Regex search via bash/rg/grep is allowed when needed and should reset read-streak pressure.
+- When tools return nextCursor, continue with cursor for pagination instead of broad fallback scans.
+
+Parameter rules:
+- File paths are project-relative (not absolute).
+- line/column are 1-based.
+- Put column on the symbol name, not whitespace or punctuation.
+- Use project_path only when required (multi-project workspace).
+- IDE tool targets must stay inside the current working directory.
+- If using mcp proxy mode, pass arguments exactly as the target IDE tool schema expects.
+
+Mistakes to avoid:
+- Do not grep for semantic usages/definitions.
+- Do not use text replace/sed/edit/write for symbol rename (use IDE rename refactor).
+- Do not use mv/git mv for code file moves (use IDE move refactor).
+- Do not use search_text as regex search.
+- Do not use find_class to find methods/functions.
+
+Runtime guard note:
+- edit/write is guarded by this extension against IDE dumb mode.
+- diagnostics flow syncs changed relative paths; avoid root sync unless necessary.

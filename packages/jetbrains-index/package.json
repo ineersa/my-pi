@@ -1,6 +1,6 @@
 {
   "name": "@ineersa/my-pi-jetbrains-index",
-  "version": "0.1.10",
+  "version": "0.3.0",
   "description": "JetBrains index diagnostics gate extension for pi-coding-agent",
   "keywords": [
     "pi-package"
@@ -27,7 +27,8 @@
     "url": "https://github.com/ineersa/my-pi/issues"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.25.1"
+    "@modelcontextprotocol/sdk": "^1.25.1",
+    "@toon-format/toon": "^2.1.0"
   },
   "peerDependencies": {
     "@mariozechner/pi-agent-core": "*",

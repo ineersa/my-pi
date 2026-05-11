@@ -4,26 +4,17 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { formatDiagnosticsSummary } from "./diagnostics.js";
 import {
 	buildMoveRefactorReminder,
-	buildNewDiagnosticsReminder,
-	buildReadEfficiencyReminder,
-	buildSystemPromptPolicy,
-	wrapSystemReminder,
+	buildNewDiagnosticsMessage,
+	MINIMAL_IDE_PROMPT,
 } from "./prompts.js";
 import {
-	LARGE_READ_CONSECUTIVE_BLOCK_THRESHOLD,
-	LARGE_READ_LINE_THRESHOLD,
 	MOVE_BASH_REGEX,
-	NON_SYMBOLIC_DENY_COOLDOWN_MS,
-	NON_SYMBOLIC_STREAK_BLOCK_THRESHOLD,
-	NON_SYMBOLIC_UNBOUNDED_READ_INCREMENT,
 	NUDGE_COOLDOWN_MS,
-	SEARCH_BASH_REGEX,
 } from "./constants.js";
 import { ProblemsTracker } from "./problems-tracker.js";
+import { createAllWrapperTools } from "./wrappers.js";
 
 const SINGLETON_KEY = "__my_pi_jetbrains_index_owner__";
-const JETBRAINS_INDEX_PACKAGE_DOCS_INDEX = resolve(__dirname, "..", "..", "docs", "ai-index.json");
-const JETBRAINS_INDEX_ENTITY_NAME = "jetbrains-index";
 
 function getFilePathFromToolInput(input: Record<string, unknown>): string | null {
 	const candidates = [input.path, input.file_path, input.filePath, input.file];
@@ -35,139 +26,12 @@ function getFilePathFromToolInput(input: Record<string, unknown>): string | null
 	return null;
 }
 
-// Extensions for languages with AST/symbol support in JetBrains IDEs.
-// Config/data formats (.json, .yaml, .xml, .html, .css, etc.) are excluded
-// because IDE index tools do not provide semantic navigation for them.
-const CODE_FILE_EXTENSIONS = new Set([
-	".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts",
-	".py", ".pyw", ".pyi",
-	".php",
-	".java", ".kt", ".kts", ".groovy",
-	".c", ".h", ".cpp", ".hpp", ".cc", ".cxx", ".c++", ".hxx",
-	".cs", ".csx",
-	".go",
-	".rs",
-	".rb", ".rake", ".gemspec",
-	".swift",
-	".scala", ".sbt",
-	".r", ".R",
-	".lua",
-	".pl", ".pm",
-	".sh", ".bash", ".zsh", ".fish",
-	".ps1", ".psm1",
-	".sql",
-	".graphql", ".gql",
-	".proto",
-	".dart",
-	".zig",
-	".nim", ".nims",
-	".ex", ".exs",
-	".erl", ".hrl",
-	".clj", ".cljs", ".cljc",
-	".hs",
-	".ml", ".mli",
-	".el", ".elisp",
-	".lisp", ".cl",
-	".tcl",
-	".raku",
-	".sol",
-]);
-
-function isPathInsideCwd(filePath: string | null | undefined, cwd: string): boolean {
-	if (!filePath) return false;
-	const trimmed = filePath.trim();
-	if (trimmed.length === 0) return false;
-	const resolvedCwd = resolve(cwd);
-	const resolvedTarget = isAbsolute(trimmed) ? resolve(trimmed) : resolve(resolvedCwd, trimmed);
-	const rel = relative(resolvedCwd, resolvedTarget);
-	return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
-}
-
-function isCodeFile(filePath: string | null | undefined): boolean {
-	if (!filePath) return false;
-	const lastDot = filePath.lastIndexOf(".");
-	if (lastDot === -1) return true; // no extension → treat as code (e.g. Makefile)
-	const ext = filePath.slice(lastDot).toLowerCase();
-	return CODE_FILE_EXTENSIONS.has(ext);
-}
-
-function isUnboundedReadInput(input: Record<string, unknown>): boolean {
-	const hasOffset = typeof input.offset === "number";
-	const hasLimit = typeof input.limit === "number";
-	return !hasOffset && !hasLimit;
-}
-
-function countTextLinesFromToolContent(content: unknown): number {
-	if (!Array.isArray(content)) {
-		return 0;
-	}
-
-	let lines = 0;
-	for (const block of content) {
-		if (!(block && typeof block === "object")) {
-			continue;
-		}
-		const record = block as Record<string, unknown>;
-		if (record.type !== "text") {
-			continue;
-		}
-		const text = record.text;
-		if (typeof text !== "string" || text.length === 0) {
-			continue;
-		}
-		lines += text.split(/\r?\n/).length;
-	}
-
-	return lines;
-}
-
-function resolveEffectiveToolName(toolName: string, input: Record<string, unknown>): string {
-	if (toolName !== "mcp") {
-		return toolName;
-	}
-
-	const proxyTool = input.tool;
-	if (typeof proxyTool === "string" && proxyTool.trim().length > 0) {
-		return proxyTool.trim();
-	}
-
-	return toolName;
-}
-
-function isSemanticIdeTool(toolName: string): boolean {
-	return toolName.endsWith("ide_find_file")
-		|| toolName.endsWith("ide_search_text")
-		|| toolName.endsWith("ide_find_class")
-		|| toolName.endsWith("ide_find_definition")
-		|| toolName.endsWith("ide_find_references")
-		|| toolName.endsWith("ide_find_implementations")
-		|| toolName.endsWith("ide_find_super_methods")
-		|| toolName.endsWith("ide_type_hierarchy")
-		|| toolName.endsWith("ide_call_hierarchy")
-		|| toolName.endsWith("ide_refactor_rename")
-		|| toolName.endsWith("ide_move_file")
-		|| toolName.endsWith("ide_diagnostics");
-}
-
 function getBashCommand(input: Record<string, unknown>): string {
 	const command = input.command;
 	if (typeof command !== "string") {
 		return "";
 	}
 	return command.trim();
-}
-
-function isShellSearchResetTool(toolName: string, input: Record<string, unknown>): boolean {
-	if (toolName === "grep") {
-		return true;
-	}
-
-	if (toolName === "bash") {
-		const command = getBashCommand(input);
-		return command.length > 0 && SEARCH_BASH_REGEX.test(command);
-	}
-
-	return false;
 }
 
 function isMoveCommand(command: string): boolean {
@@ -177,6 +41,33 @@ function isMoveCommand(command: string): boolean {
 function toCommandPreview(command: string): string {
 	const normalized = command.replace(/\s+/g, " ").trim();
 	return normalized.length > 120 ? `${normalized.slice(0, 117)}...` : normalized;
+}
+
+/**
+ * Check whether a bash command is an mv/git mv that targets a file inside cwd.
+ * Conservative: avoids false positives over catching every shell shape.
+ */
+function isMoveInsideCwd(command: string, cwd: string): boolean {
+	const trimmed = command.trim();
+	if (!MOVE_BASH_REGEX.test(trimmed)) return false;
+
+	// Strip the command prefix (mv or git mv)
+	const withoutCommand = trimmed.replace(/^(?:git\s+)?mv\s+/, "");
+	const args = withoutCommand.split(/\s+/).filter((a) => a && !a.startsWith("-"));
+
+	for (const arg of args) {
+		try {
+			const resolved = resolve(cwd, arg);
+			const rel = relative(cwd, resolved);
+			if (!rel.startsWith("..") && !isAbsolute(rel)) {
+				return true;
+			}
+		} catch {
+			// skip
+		}
+	}
+
+	return false;
 }
 
 // noinspection JSUnusedGlobalSymbols
@@ -189,18 +80,10 @@ export default function jetbrainsIndexExtension(pi: ExtensionAPI): void {
 	const ownerToken = Symbol("jetbrains-index-owner");
 	globalState[SINGLETON_KEY] = ownerToken;
 
-	let extensionEnabled = false;
-	let indexDisabledForSession = false;
+	let extensionActive = false;
 	let uiNotify: ((message: string, level: "info" | "warning" | "error") => void) | null = null;
-	let unboundedReadCountThisTurn = 0;
-	let unboundedReadWarningSentThisTurn = false;
-	let consecutiveLargeReadCountThisTurn = 0;
-	let nearReadBlockWarningSentThisTurn = false;
-	let nonSymbolicStreakCountThisTurn = 0;
-	let lastNonSymbolicDenyAt = 0;
-	let sessionStartNudgePending = false;
-	let lastReadReminderAt = 0;
 	let lastMoveReminderAt = 0;
+	let toolsRegistered = false;
 
 	const tracker = new ProblemsTracker((message, level) => {
 		uiNotify?.(message, level);
@@ -214,75 +97,92 @@ export default function jetbrainsIndexExtension(pi: ExtensionAPI): void {
 		}
 	}
 
-	async function refreshExtensionEnabled(cwd: string): Promise<boolean> {
+	async function tryActivateForCwd(cwd: string): Promise<boolean> {
 		if (!hasIdeaDirectory(cwd)) {
-			extensionEnabled = false;
+			extensionActive = false;
 			await tracker.shutdown();
 			return false;
 		}
 		try {
 			const connected = await tracker.initialize(cwd);
-			extensionEnabled = connected;
+			extensionActive = connected;
 			if (!connected) {
 				await tracker.shutdown();
 			}
 			return connected;
-		} catch (error) {
-			extensionEnabled = false;
-			const message = error instanceof Error ? error.message : String(error);
-			uiNotify?.(`JetBrains index diagnostics gate failed to initialize: ${message}`, "error");
+		} catch {
+			extensionActive = false;
+			// Silent failure — stay dormant
 			return false;
 		}
 	}
 
-	function disableForSession(reason: string): void {
-		if (indexDisabledForSession) {
-			return;
+	async function checkOrAbort(ctx: {
+		hasUI: boolean;
+		ui: { notify: (m: string, l: "info" | "warning" | "error") => void };
+		abort: () => void;
+	}, toolName: string): Promise<boolean> {
+		// Returns true if safe to proceed, false if blocked
+		const readiness = await tracker.checkIndexReady();
+		if (readiness.ready) {
+			return true;
 		}
-		indexDisabledForSession = true;
-		extensionEnabled = false;
-		uiNotify?.(`⚠️ JetBrains index disabled for this session: ${reason}`, "warning");
-		uiNotify?.("ℹ️ Edit/write will proceed without index checks or diagnostics.", "info");
-	}
 
-	function notifyIndexBlock(ctx: { hasUI: boolean; ui: { notify: (m: string, l: "info" | "warning" | "error") => void } }, reason: string): void {
-		if (!ctx.hasUI) {
-			return;
+		if (ctx.hasUI) {
+			ctx.ui.notify(
+				`⛔ JetBrains IDE/index unavailable for tool "${toolName}". Fix your IDE/index and type "continue" to retry.`,
+				"error",
+			);
 		}
-		ctx.ui.notify(`⛔ Edit/write blocked: ${reason}`, "error");
+
+		// Block the tool call and abort the current agent run
+		ctx.abort();
+
+		return false;
 	}
 
 	pi.on("session_start", async (_event, ctx) => {
 		tracker.reset();
-		indexDisabledForSession = false;
-		unboundedReadCountThisTurn = 0;
-		unboundedReadWarningSentThisTurn = false;
-		consecutiveLargeReadCountThisTurn = 0;
-		nearReadBlockWarningSentThisTurn = false;
-		nonSymbolicStreakCountThisTurn = 0;
 		if (ctx.hasUI) {
 			uiNotify = ctx.ui.notify.bind(ctx.ui);
 		}
 
-		const connected = await refreshExtensionEnabled(ctx.cwd);
-		if (!connected) {
-			const disableReason = tracker.getStatus().lastError ?? "requirements not satisfied";
-			disableForSession(disableReason);
+		const activated = await tryActivateForCwd(ctx.cwd);
+		if (!activated) {
+			// Stay dormant — no prompt injection, no guards, no tools
 			return;
 		}
 
-		sessionStartNudgePending = true;
-		if (ctx.hasUI) {
+		// Perform initial whole-project sync
+		await tracker.syncProject();
+
+		// Register first-class wrapper tools if not already registered
+		if (!toolsRegistered) {
+			const client = tracker.getClient();
+			if (client) {
+				const wrapperTools = createAllWrapperTools(client);
+				for (const tool of wrapperTools) {
+					// eslint-disable-next-line @typescript-eslint/no-explicit-any
+					pi.registerTool(tool as any);
+				}
+				toolsRegistered = true;
+				if (ctx.hasUI) {
+					ctx.ui.notify(
+						`🔍 JetBrains index active — ${wrapperTools.length} IDE tool(s) registered`,
+						"info",
+					);
+				}
+			}
+		}
+
+		if (ctx.hasUI && !toolsRegistered) {
 			ctx.ui.notify("🔍 JetBrains index diagnostics gate enabled", "info");
 		}
 	});
 
 	pi.on("session_shutdown", async () => {
 		await tracker.shutdown();
-		extensionEnabled = false;
-		indexDisabledForSession = false;
-		sessionStartNudgePending = false;
-		nonSymbolicStreakCountThisTurn = 0;
+		extensionActive = false;
 		uiNotify = null;
 
 		if (globalState[SINGLETON_KEY] === ownerToken) {
@@ -291,121 +191,55 @@ export default function jetbrainsIndexExtension(pi: ExtensionAPI): void {
 	});
 
 	pi.on("turn_start", async (_event, ctx) => {
-		tracker.reset();
-		unboundedReadCountThisTurn = 0;
-		unboundedReadWarningSentThisTurn = false;
-		consecutiveLargeReadCountThisTurn = 0;
-		nearReadBlockWarningSentThisTurn = false;
-		nonSymbolicStreakCountThisTurn = 0;
-
-		if (indexDisabledForSession) {
-			return;
+		if (!extensionActive) {
+			// Attempt activation if not yet active (IDE may have become available)
+			const activated = await tryActivateForCwd(ctx.cwd);
+			if (!activated) {
+				return;
+			}
+			if (ctx.hasUI) {
+				ctx.ui.notify("🔍 JetBrains index diagnostics gate enabled", "info");
+			}
 		}
 
-		await refreshExtensionEnabled(ctx.cwd);
-		if (!extensionEnabled) {
-			const disableReason = tracker.getStatus().lastError ?? "requirements not satisfied";
-			disableForSession(disableReason);
+		// Check index and sync the whole project at turn start
+		const readiness = await tracker.checkIndexReady();
+		if (readiness.ready) {
+			await tracker.syncProject();
+		} else {
+			if (ctx.hasUI) {
+				ctx.ui.notify(
+					`JetBrains IDE/index not ready at turn start: ${readiness.message ?? "unknown reason"}. Will recheck before each tool call.`,
+					"warning",
+				);
+			}
 		}
 	});
 
 	pi.on("before_agent_start", (event) => {
-		if (!extensionEnabled || indexDisabledForSession) {
+		if (!extensionActive) {
 			return;
 		}
 
-		const reminders = [
-			wrapSystemReminder(buildSystemPromptPolicy(pi.getActiveTools())),
-			wrapSystemReminder(
-				[
-					`Extension docs guard: only read ${JETBRAINS_INDEX_PACKAGE_DOCS_INDEX} and the target entity's settings.md + maintenance.md when:`,
-					`- You intend to modify the \"${JETBRAINS_INDEX_ENTITY_NAME}\" extension code or its settings.`,
-					"- The user asks about how to configure or use the jetbrains-index extension.",
-					"- The user asks about IDE index diagnostics, dumb-mode blocking, or read-efficiency guardrails.",
-					"Otherwise do NOT read these docs.",
-				].join("\n"),
-			),
-		];
-		if (sessionStartNudgePending) {
-			sessionStartNudgePending = false;
-			reminders.push(wrapSystemReminder([
-				"JetBrains index is available in this session.",
-				"- Prefer IDE semantic tools first before broad read/grep/bash exploration.",
-				"- Start with jetbrains_index__ide_find_file, jetbrains_index__ide_search_text, jetbrains_index__ide_find_definition, and jetbrains_index__ide_find_references.",
-				"- Keep reads focused with offset/limit windows.",
-			].join("\n")));
-		}
-
 		return {
-			systemPrompt: `${event.systemPrompt}\n\n${reminders.join("\n\n")}`,
+			systemPrompt: `${event.systemPrompt}\n\n${MINIMAL_IDE_PROMPT}`,
 		};
 	});
 
 	pi.on("tool_call", async (event, ctx) => {
-		if (!extensionEnabled || indexDisabledForSession) {
+		if (!extensionActive) {
 			return;
 		}
 
 		const input = (event.input ?? {}) as Record<string, unknown>;
-		const effectiveToolName = resolveEffectiveToolName(event.toolName, input);
 
-		const isSemanticReset = isSemanticIdeTool(effectiveToolName);
-		const isShellSearchReset = isShellSearchResetTool(effectiveToolName, input);
-		if (isSemanticReset || isShellSearchReset) {
-			consecutiveLargeReadCountThisTurn = 0;
-			nearReadBlockWarningSentThisTurn = false;
-			nonSymbolicStreakCountThisTurn = 0;
-			unboundedReadCountThisTurn = 0;
-			unboundedReadWarningSentThisTurn = false;
+		// Health check before ANY tool call
+		const canProceed = await checkOrAbort(ctx, event.toolName);
+		if (!canProceed) {
+			return { block: true, reason: "JetBrains IDE/index unavailable. Fix and type continue." };
 		}
 
-		if (
-			effectiveToolName === "read"
-			&& isCodeFile(getFilePathFromToolInput(input))
-			&& isPathInsideCwd(getFilePathFromToolInput(input), ctx.cwd)
-			&& isUnboundedReadInput(input)
-			&& consecutiveLargeReadCountThisTurn >= LARGE_READ_CONSECUTIVE_BLOCK_THRESHOLD
-		) {
-			const reason = `Blocked unbounded read after ${consecutiveLargeReadCountThisTurn} consecutive large reads (> ${LARGE_READ_LINE_THRESHOLD} lines). Use IDE search-first tools or switch to bounded read (offset/limit).`;
-			consecutiveLargeReadCountThisTurn = 0;
-			nearReadBlockWarningSentThisTurn = false;
-			if (ctx.hasUI) {
-				ctx.ui.notify(`⛔ ${reason}`, "error");
-			}
-			return {
-				block: true,
-				reason,
-			};
-		}
-
-		if (!isSemanticReset && !isShellSearchReset) {
-			const isUnboundedCodeRead =
-				effectiveToolName === "read"
-				&& isCodeFile(getFilePathFromToolInput(input))
-				&& isPathInsideCwd(getFilePathFromToolInput(input), ctx.cwd)
-				&& isUnboundedReadInput(input);
-			if (isUnboundedCodeRead) {
-				const now = Date.now();
-				const cooldownElapsed =
-					lastNonSymbolicDenyAt === 0 || now - lastNonSymbolicDenyAt >= NON_SYMBOLIC_DENY_COOLDOWN_MS;
-				if (
-					cooldownElapsed
-					&& nonSymbolicStreakCountThisTurn >= NON_SYMBOLIC_STREAK_BLOCK_THRESHOLD
-				) {
-					const reason = `Blocked read (unbounded) after ${nonSymbolicStreakCountThisTurn} consecutive non-symbolic large-read steps. Prefer JetBrains IDE index tools first (find_definition/find_references/find_file/search_text). Cooldown: ${Math.round(NON_SYMBOLIC_DENY_COOLDOWN_MS / 1000)}s.`;
-					nonSymbolicStreakCountThisTurn = 0;
-					lastNonSymbolicDenyAt = now;
-					if (ctx.hasUI) {
-						ctx.ui.notify(`⛔ ${reason}`, "warning");
-					}
-					return {
-						block: true,
-						reason,
-					};
-				}
-			}
-		}
-
+		// For edit/write: pre-mutation baseline capture
 		if (event.toolName !== "edit" && event.toolName !== "write") {
 			return;
 		}
@@ -426,94 +260,38 @@ export default function jetbrainsIndexExtension(pi: ExtensionAPI): void {
 			}
 
 			const reason = beforeMutation.reason ?? "IDE index is not ready after retries.";
-			disableForSession(reason);
+			if (ctx.hasUI) {
+				ctx.ui.notify(`⛔ Edit/write blocked: ${reason}`, "error");
+			}
+			ctx.abort();
 			return {
 				block: true,
-				reason: `${reason} Extension disabled for this session — subsequent edits will proceed without index checks.`,
+				reason,
 			};
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			const reason = `Diagnostics preflight failed: ${message}`;
-			disableForSession(reason);
+			if (ctx.hasUI) {
+				ctx.ui.notify(`Diagnostics preflight failed: ${message}`, "error");
+			}
+			ctx.abort();
 			return {
 				block: true,
-				reason: `${reason} Extension disabled for this session — subsequent edits will proceed without index checks.`,
+				reason: `Diagnostics preflight failed: ${message}`,
 			};
 		}
 	});
 
 	pi.on("tool_result", async (event, ctx) => {
-		if (!extensionEnabled || indexDisabledForSession) {
+		if (!extensionActive) {
 			return;
 		}
 
 		const input = (event.input ?? {}) as Record<string, unknown>;
 
-		if (event.toolName === "read" && !event.isError) {
-			const filePath = getFilePathFromToolInput(input);
-			if (!isCodeFile(filePath) || !isPathInsideCwd(filePath, ctx.cwd)) return;
-
-			const unbounded = isUnboundedReadInput(input);
-			const lineCount = countTextLinesFromToolContent(event.content);
-			const isLargeRead = lineCount > LARGE_READ_LINE_THRESHOLD;
-
-			if (!unbounded) {
-				consecutiveLargeReadCountThisTurn = 0;
-				nearReadBlockWarningSentThisTurn = false;
-				nonSymbolicStreakCountThisTurn = 0;
-			} else if (isLargeRead) {
-				consecutiveLargeReadCountThisTurn += 1;
-				nonSymbolicStreakCountThisTurn += NON_SYMBOLIC_UNBOUNDED_READ_INCREMENT;
-			} else {
-				consecutiveLargeReadCountThisTurn = 0;
-				nearReadBlockWarningSentThisTurn = false;
-				nonSymbolicStreakCountThisTurn = 0;
-			}
-
-			if (unbounded && isLargeRead) {
-				unboundedReadCountThisTurn += 1;
-				const reasons: string[] = [
-					`Large unbounded read detected (${lineCount} lines). Use search-first and bounded reads to minimize tokens.`,
-				];
-
-				if (unboundedReadCountThisTurn >= 2 && !unboundedReadWarningSentThisTurn) {
-					unboundedReadWarningSentThisTurn = true;
-					reasons.push(
-						`You already made ${unboundedReadCountThisTurn} large unbounded reads this turn. Prefer bounded read windows (offset/limit).`,
-					);
-				}
-
-				if (
-					consecutiveLargeReadCountThisTurn === LARGE_READ_CONSECUTIVE_BLOCK_THRESHOLD - 1
-					&& !nearReadBlockWarningSentThisTurn
-				) {
-					nearReadBlockWarningSentThisTurn = true;
-					reasons.push(
-						"Hard limit warning: one more consecutive large unbounded read will be blocked. Use search-first IDE tools or a bounded read first.",
-					);
-				}
-
-				if (reasons.length > 0) {
-					const now = Date.now();
-					if (now - lastReadReminderAt >= NUDGE_COOLDOWN_MS) {
-						lastReadReminderAt = now;
-						if (ctx.hasUI) {
-							ctx.ui.notify("⚠ Prefer search-first and bounded reads for token efficiency", "warning");
-						}
-
-						const reminder = buildReadEfficiencyReminder(pi.getActiveTools(), reasons);
-						const baseContent = Array.isArray(event.content) ? event.content : [];
-						return {
-							content: [...baseContent, { type: "text", text: reminder }],
-						};
-					}
-				}
-			}
-		}
-
+		// Narrowed mv/git mv nudge — only when target is inside cwd
 		if (event.toolName === "bash" && !event.isError) {
 			const command = getBashCommand(input);
-			if (command && isMoveCommand(command)) {
+			if (command && isMoveCommand(command) && isMoveInsideCwd(command, ctx.cwd)) {
 				const now = Date.now();
 				if (now - lastMoveReminderAt >= NUDGE_COOLDOWN_MS) {
 					lastMoveReminderAt = now;
@@ -530,6 +308,7 @@ export default function jetbrainsIndexExtension(pi: ExtensionAPI): void {
 			}
 		}
 
+		// Post-write diagnostics flow
 		if (event.toolName !== "edit" && event.toolName !== "write") {
 			return;
 		}
@@ -560,10 +339,10 @@ export default function jetbrainsIndexExtension(pi: ExtensionAPI): void {
 			}
 
 			const summary = formatDiagnosticsSummary(newProblems);
-			const reminder = buildNewDiagnosticsReminder(summary);
+			const message = buildNewDiagnosticsMessage(summary);
 			const baseContent = Array.isArray(event.content) ? event.content : [];
 			return {
-				content: [...baseContent, { type: "text", text: reminder }],
+				content: [...baseContent, { type: "text", text: message }],
 			};
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);

@@ -2,33 +2,69 @@
 
 ## What it does during a session
 
-When active, the extension adds IDE-first safety rails around agent behavior:
+When active, the extension provides:
 
-1. **Policy injection**
-   - Appends a strict system reminder that maps coding tasks to JetBrains IDE index tools.
-   - Adds a one-time session-start nudge to begin with semantic IDE lookups.
+1. **Minimal IDE tool guidance**
+   - Injects a short plain-text prompt guideline into the system prompt.
+   - Prefer file + line + column when known; otherwise use symbol (with fileHint for JS/TS).
 
-2. **Edit/write gate (dumb mode protection)**
-   - Before every `edit` or `write`, checks index readiness (`ide_index_status`) with retries.
-   - If readiness fails, blocks the current mutation and disables this extension for the rest of the session.
+2. **Hard stop on broken IDE/index**
+   - Before every tool call, checks IDE/index readiness.
+   - If unavailable after retries: blocks the tool, notifies the user, aborts the agent run.
+   - User fixes IDE and types `continue` to recover — extension stays active.
 
-3. **Diagnostics workflow after mutations**
-   - Captures baseline diagnostics before mutation for existing files.
-   - After successful mutation:
-     - syncs changed paths (`ide_sync_files`),
-     - waits for index readiness,
-     - fetches diagnostics,
-     - reports only **newly introduced** issues as a system reminder.
+3. **Turn-start project sync**
+   - On each agent turn start, performs a whole-project sync.
 
-4. **Guardrails and reminders**
-   - Read-efficiency reminders for repeated unbounded reads.
-   - Hard block for repeated large unbounded reads.
-   - Reminder when `mv`/`git mv` appears in bash output (prefer IDE move refactor).
-   - Block for sustained non-symbolic exploration streaks (resets after semantic IDE tool usage).
+4. **Post-mutation diagnostics**
+   - After every successful `edit` or `write`:
+     - Opens the file in the IDE.
+     - Syncs the changed file path.
+     - Waits for index readiness.
+     - Runs diagnostics and reports only newly introduced issues.
+
+5. **Move-refactor nudges**
+   - Detects `mv` / `git mv` targeting files inside CWD.
+   - Nudges toward `ide_move_file` so imports/references are updated automatically.
+
+6. **First-class IDE wrapper tools**
+   - Registers first-class Pi tools when IDE is available:
+
+| Tool | Category | Description |
+|---|---|---|
+| `ide_find_file` | Search | Find files by name using the IDE index |
+| `ide_search_text` | Search | Search for exact words using the IDE word index |
+| `ide_find_symbol` | Search | Search for symbols (classes, methods, etc.) by name |
+| `ide_find_definition` | Semantic | Go to symbol definition |
+| `ide_find_references` | Semantic | Find all references to a symbol |
+| `ide_refactor_rename` | Semantic | Rename a symbol and update all references |
+| `ide_find_implementations` | Semantic | Find implementations of a symbol |
+| `ide_find_super_methods` | Semantic | Find parent/overridden methods |
+| `ide_type_hierarchy` | Semantic | Show type hierarchy (supertypes/subtypes) |
+| `ide_call_hierarchy` | Semantic | Show call hierarchy (callers/callees) |
+| `ide_diagnostics` | Diagnostics | Get diagnostics, build errors, and test results |
+| `ide_move_file` | Refactor | Move a file and update all references/imports |
+| `ide_file_structure` | Navigation | Show file structure overview |
+
+## Mutation behavior for IDE refactor tools
+
+- `ide_refactor_rename` and `ide_move_file` perform one whole-project sync
+  after a successful IDE mutation, then wait for index readiness.
+- These tools do **not** run diagnostics after mutation by design — a
+  whole-project sync is sufficient to keep IDE state coherent after a
+  multi-file refactor.
+- Built-in `edit` and `write` continue to get targeted post-mutation
+  diagnostics (open file → sync file → wait for index → diff).
+
+## Targeting guidance
+
+Semantic tools that resolve symbols prefer a location (`file + line + column`) when known.
+Otherwise, use `symbol`. For JS/TS, prefer adding `fileHint` when using `symbol` mode.
 
 ## Typical workflow
 
-- Use IDE index search/definition/reference tools first.
-- Use bounded reads (`offset`/`limit`) when reading files.
-- Use IDE refactors for symbol rename and file move.
-- After edits, address any new diagnostics reminder before finalizing.
+- Use IDE tools for semantic code operations first.
+- Prefer `file + line + column` over bare symbol names when known.
+- Use `fileHint` for JS/TS symbol lookups.
+- After edits, address any new diagnostics before finalizing.
+- For file moves: use `ide_move_file` instead of `mv`/`git mv` so references are updated.

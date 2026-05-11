@@ -20,7 +20,8 @@
       "./extensions/output-cap/output-cap.ts",
       "./extensions/fork/fork.ts",
       "./extensions/ide/ide.ts",
-      "./extensions/verbosity-control/verbosity-control.ts"
+      "./extensions/verbosity-control/verbosity-control.ts",
+      "./extensions/prompt-channels/prompt-channels.ts"
     ]
   },
   "files": [

@@ -19,7 +19,7 @@
     "../../claw/pi-observational-memory",
     "../../claw/my-pi/packages/pi-mcp-adapter"
   ],
-  "hideThinkingBlock": true,
+  "hideThinkingBlock": false,
   "observational-memory": {
     "observationThresholdTokens": 1000,
     "compactionThresholdTokens": 50000,
@@ -29,6 +29,9 @@
       "provider": "llama.cpp",
       "id": "flash"
     }
+  },
+  "jetbrainsIndex": {
+    "url": "http://127.0.0.1:29175/index-mcp/streamable-http"
   },
   "compaction": {
     "enabled": true,

@@ -1,14 +1,16 @@
 import { existsSync, statSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { areDiagnosticsEqual, type Diagnostic, type DiagnosticFile } from "./diagnostics.js";
-import { findJetBrainsMcpServer, type JetBrainsMcpServerConfig } from "./mcp-config.js";
-import { McpProblemsClient } from "./mcp-problems-client.js";
+import { loadJetBrainsConfig } from "./settings-config.js";
+import { JetBrainsService } from "./jetbrains-service.js";
+
+// ---------------------------------------------------------------------------
+// Public types
+// ---------------------------------------------------------------------------
 
 export type ProblemsTrackerStatus = {
 	initialized: boolean;
 	connected: boolean;
-	serverName?: string;
-	sseUrl?: string;
 	configPath?: string;
 	lastError?: string;
 };
@@ -20,14 +22,16 @@ export function formatProblemsTrackerStatus(status: ProblemsTrackerStatus): stri
 			: "problems tracker: unavailable";
 	}
 
-	const endpoint = status.sseUrl ?? "(unknown endpoint)";
-	const serverName = status.serverName ?? "jetbrains-index";
 	if (!status.connected) {
-		return `problems tracker: disconnected (${serverName} @ ${endpoint})`;
+		return `problems tracker: disconnected (config: ${status.configPath ?? "unknown"})`;
 	}
 
-	return `problems tracker: connected (${serverName} @ ${endpoint})`;
+	return `problems tracker: connected (config: ${status.configPath ?? "unknown"})`;
 }
+
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
 
 function normalizePathForComparison(filePath: string): string {
 	const resolved = resolve(filePath);
@@ -56,6 +60,10 @@ function hasIdeaDirectory(cwd: string): boolean {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
 type NotifyFn = (message: string, level: "info" | "warning" | "error") => void;
 
 type BeforeMutationResult = {
@@ -71,9 +79,13 @@ type PendingMutationContext = {
 
 const NOOP_NOTIFY: NotifyFn = () => {};
 
+// ---------------------------------------------------------------------------
+// ProblemsTracker
+// ---------------------------------------------------------------------------
+
 export class ProblemsTracker {
-	private client: McpProblemsClient | null = null;
-	private config: JetBrainsMcpServerConfig | null = null;
+	private service: JetBrainsService | null = null;
+	private configPath: string | null = null;
 	private projectPath: string | null = null;
 	private readonly pendingMutations = new Map<string, PendingMutationContext>();
 	private lastError: string | undefined;
@@ -84,16 +96,14 @@ export class ProblemsTracker {
 	}
 
 	isInitialized(): boolean {
-		return this.client !== null && this.projectPath !== null;
+		return this.service !== null && this.projectPath !== null;
 	}
 
 	getStatus(): ProblemsTrackerStatus {
 		return {
 			initialized: this.isInitialized(),
-			connected: this.isInitialized() && this.client !== null && this.client.isConnected,
-			serverName: this.config?.serverName,
-			sseUrl: this.config?.sseUrl,
-			configPath: this.config?.configPath,
+			connected: this.isInitialized() && this.service !== null && this.service.isConnected,
+			configPath: this.configPath ?? undefined,
 			lastError: this.lastError,
 		};
 	}
@@ -102,6 +112,13 @@ export class ProblemsTracker {
 		return formatProblemsTrackerStatus(this.getStatus());
 	}
 
+	/**
+	 * Initialize a connection to the JetBrains index MCP service.
+	 *
+	 * - Checks for .idea/ directory.
+	 * - Loads connection config (prefers settings.json, falls back to mcp.json).
+	 * - Creates a JetBrainsService and validates connectivity.
+	 */
 	async initialize(cwd: string): Promise<boolean> {
 		const normalizedCwd = resolve(cwd);
 
@@ -110,8 +127,8 @@ export class ProblemsTracker {
 			return false;
 		}
 
-		if (this.client && this.projectPath === normalizedCwd) {
-			const healthy = await this.client.probe();
+		if (this.service && this.projectPath === normalizedCwd) {
+			const healthy = await this.service.probe();
 			if (healthy) {
 				this.lastError = undefined;
 				return true;
@@ -124,23 +141,27 @@ export class ProblemsTracker {
 
 		await this.shutdown();
 
-		const config = findJetBrainsMcpServer(normalizedCwd);
+		const config = loadJetBrainsConfig(normalizedCwd);
 		if (!config) {
-			this.lastError = "JetBrains MCP server 'jetbrains-index' was not found in .pi/mcp.json or ~/.pi/agent/mcp.json.";
+			this.lastError =
+				"JetBrains MCP server 'jetbrains-index' was not found in settings.json or mcp.json.";
 			return false;
 		}
 
-		const client = new McpProblemsClient(config.sseUrl, config.headers, this.notify);
-		const healthy = await client.probe();
+		const service = new JetBrainsService(config.url, config.headers, this.notify);
+		const healthy = await service.probe();
 		if (!healthy) {
 			this.lastError = "JetBrains index MCP initial connection failed.";
 			this.notify(`JetBrains index diagnostics disabled: ${this.lastError}`, "error");
-			await client.shutdown();
+			await service.shutdown();
 			return false;
 		}
 
-		this.client = client;
-		this.config = config;
+		// Scope service to this project
+		service.projectPath = normalizedCwd;
+
+		this.service = service;
+		this.configPath = config.configPath;
 		this.projectPath = normalizedCwd;
 		this.lastError = undefined;
 		return true;
@@ -150,35 +171,65 @@ export class ProblemsTracker {
 		this.pendingMutations.clear();
 	}
 
+	/**
+	 * Check if the IDE index is ready for this project.
+	 */
+	async checkIndexReady(): Promise<{ ready: boolean; message?: string }> {
+		if (!(this.service && this.projectPath)) {
+			return { ready: false, message: "No active JetBrains connection for this project." };
+		}
+
+		return this.service.waitForIndexReady();
+	}
+
+	/**
+	 * Sync the entire project directory via the IDE index.
+	 */
+	async syncProject(): Promise<boolean> {
+		if (!this.service) {
+			return false;
+		}
+
+		return this.service.syncProject();
+	}
+
+	/**
+	 * Get the underlying JetBrains service for direct access.
+	 */
+	getClient(): JetBrainsService | null {
+		return this.service;
+	}
+
+	/**
+	 * Get the current project path.
+	 */
+	getProjectPath(): string | null {
+		return this.projectPath;
+	}
+
 	async shutdown(): Promise<void> {
 		this.reset();
-		await this.client?.shutdown();
-		this.client = null;
-		this.config = null;
+		await this.service?.shutdown();
+		this.service = null;
+		this.configPath = null;
 		this.projectPath = null;
 	}
 
 	async beforeFileMutation(filePath: string): Promise<BeforeMutationResult> {
-		const client = this.client;
-		const projectPath = this.projectPath;
-		if (!(client && projectPath)) {
-			return {
-				allowed: true,
-			};
+		if (!(this.service && this.projectPath)) {
+			return { allowed: true };
 		}
 
 		const absolutePath = resolve(filePath);
 		const normalizedPath = normalizePathForComparison(absolutePath);
-		const relativePath = toProjectRelativePath(projectPath, absolutePath);
+		const relativePath = toProjectRelativePath(this.projectPath, absolutePath);
 
 		if (!relativePath) {
 			this.pendingMutations.delete(normalizedPath);
-			return {
-				allowed: true,
-			};
+			return { allowed: true };
 		}
 
-		const readiness = await client.waitForIndexReady(projectPath);
+		const readiness = await this.service.waitForIndexReady();
 		if (!readiness.ready) {
 			this.pendingMutations.delete(normalizedPath);
 			return {
@@ -190,7 +241,7 @@ export class ProblemsTracker {
 		const existedBefore = existsSync(absolutePath);
 		let baselineDiagnostics: Diagnostic[] | null = null;
 		if (existedBefore) {
-			baselineDiagnostics = await client.getFileDiagnostics(relativePath, projectPath);
+			baselineDiagnostics = await this.service.getFileDiagnostics(relativePath);
 		}
 
 		this.pendingMutations.set(normalizedPath, {
@@ -199,9 +250,7 @@ export class ProblemsTracker {
 			baselineDiagnostics,
 		});
 
-		return {
-			allowed: true,
-		};
+		return { allowed: true };
 	}
 
 	discardPending(filePath: string): void {
@@ -210,9 +259,7 @@ export class ProblemsTracker {
 	}
 
 	async getNewProblems(filePaths: string[]): Promise<DiagnosticFile[]> {
-		const client = this.client;
-		const projectPath = this.projectPath;
-		if (!(client && projectPath)) {
+		if (!(this.service && this.projectPath)) {
 			return [];
 		}
 
@@ -228,12 +275,15 @@ export class ProblemsTracker {
 				continue;
 			}
 
-			const synced = await client.syncFiles([pending.relativePath], projectPath);
+			// Open file in IDE first (best-effort)
+			await this.service.openFile(pending.relativePath);
+
+			const synced = await this.service.syncFiles([pending.relativePath]);
 			if (!synced) {
 				continue;
 			}
 
-			const readiness = await client.waitForIndexReady(projectPath);
+			const readiness = await this.service.waitForIndexReady();
 			if (!readiness.ready) {
 				this.notify(
 					`Skipped diagnostics for ${pending.relativePath}: ${readiness.message ?? "IDE index is not ready."}`,
@@ -242,7 +292,7 @@ export class ProblemsTracker {
 				continue;
 			}
 
-			const currentDiagnostics = await client.getFileDiagnostics(pending.relativePath, projectPath);
+			const currentDiagnostics = await this.service.getFileDiagnostics(pending.relativePath);
 			const baseline = pending.baselineDiagnostics ?? [];
 
 			const newlyIntroduced = pending.existedBefore

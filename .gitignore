@@ -11,3 +11,4 @@ pi-settings/**/scheduler/
 
 # misc
 .DS_Store
+.vera

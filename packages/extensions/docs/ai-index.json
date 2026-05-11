@@ -146,6 +146,17 @@
         "usage": "docs/extensions/verbosity-control/settings.md",
         "maintenance": "docs/extensions/verbosity-control/maintenance.md"
       }
+    },
+    {
+      "id": "prompt-channels",
+      "kind": "extension",
+      "name": "prompt-channels",
+      "entry": "./extensions/prompt-channels/prompt-channels.ts",
+      "docs": {
+        "settings": "docs/extensions/prompt-channels/settings.md",
+        "usage": "docs/extensions/prompt-channels/settings.md",
+        "maintenance": "docs/extensions/prompt-channels/maintenance.md"
+      }
     }
   ]
 }
