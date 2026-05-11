@@ -100,7 +100,6 @@ When active, the extension registers first-class Pi wrapper tools that replace r
 | `ide_find_file` | findFile | Thin passthrough wrapper |
 | `ide_search_text` | searchText | Thin passthrough wrapper |
 | `ide_find_symbol` | findSymbol / findClass | Merged symbol search with kind filter |
-| `ide_find_definition` | findDefinition | Resolver-backed |
 | `ide_find_references` | findReferences | Resolver-backed |
 | `ide_rename_symbol` | rename | Resolver-backed, mutation-locked; syncs whole project after success, no diagnostics |
 | `ide_rename_file` | rename | Not resolver-backed; mutation-locked; syncs whole project after success, no diagnostics |

@@ -10,7 +10,6 @@
  *   tools/find-file.ts        — ide_find_file
  *   tools/search-text.ts      — ide_search_text
  *   tools/find-symbol.ts      — ide_find_symbol
- *   tools/find-definition.ts  — ide_find_definition
  *   tools/find-references.ts  — ide_find_references
  *   tools/rename-symbol.ts    — ide_rename_symbol
  *   tools/rename-file.ts      — ide_rename_file
@@ -26,7 +25,6 @@ import { JetBrainsService } from "./jetbrains-service.js";
 import { createFindFile } from "./tools/find-file.js";
 import { createSearchText } from "./tools/search-text.js";
 import { createFindSymbol } from "./tools/find-symbol.js";
-import { createDefinition } from "./tools/find-definition.js";
 import { createReferences } from "./tools/find-references.js";
 import { createRenameSymbol } from "./tools/rename-symbol.js";
 import { createRenameFile } from "./tools/rename-file.js";
@@ -68,7 +66,6 @@ export function createAllWrapperTools(service: JetBrainsService): ToolRegistrati
 	}
 
 	// Resolver-backed semantic tools
-	if (catalog.findDefinition) tools.push(createDefinition(service));
 	if (catalog.findReferences) tools.push(createReferences(service));
 	if (catalog.rename) {
 		tools.push(createRenameSymbol(service));

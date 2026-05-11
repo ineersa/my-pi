@@ -39,8 +39,8 @@ Package responsibilities:
   - `rewind`: git-based checkpoint snapshots + deterministic restore flows.
   - `session-status`: minimal session lifecycle status utility.
   - `usage`: provider usage/rate-limit probe with timeout + graceful degradation.
-  - `subagents`: trimmed subagent extension from `packages/subagents` (single + parallel foreground execution, agent discovery, skill injection, model fallback, recursion guard).
   - `output-cap`: captures large tool outputs to files and avoids response bloat.
+  - `subagents`: trimmed subagent extension from `packages/subagents` (single + parallel foreground execution, agent discovery, skill injection, model fallback, recursion guard).
   - `prompt-channels`: relocates AGENTS/project-context and skills registry from system prompt to user-level custom messages.
 - `packages/scheduler` (standalone): `schedule_prompt`, natural-language schedules,
   persisted tasks, idle dispatch, and multi-instance ownership/lease coordination.
@@ -62,9 +62,8 @@ Package responsibilities:
 | rewind | [settings](packages/extensions/docs/extensions/rewind/settings.md) · [maintenance](packages/extensions/docs/extensions/rewind/maintenance.md) |
 | session-status | [settings](packages/extensions/docs/extensions/session-status/settings.md) · [maintenance](packages/extensions/docs/extensions/session-status/maintenance.md) |
 | usage | [settings](packages/extensions/docs/extensions/usage/settings.md) · [maintenance](packages/extensions/docs/extensions/usage/maintenance.md) |
-| pi-mcp-adapter | [settings](packages/pi-mcp-adapter/docs/extensions/pi-mcp-adapter/settings.md) · [maintenance](packages/pi-mcp-adapter/docs/extensions/pi-mcp-adapter/maintenance.md) |
 | output-cap | [settings](packages/extensions/docs/extensions/output-cap/settings.md) · [maintenance](packages/extensions/docs/extensions/output-cap/maintenance.md) |
-| verbosity-control | [settings](packages/extensions/docs/extensions/verbosity-control/settings.md) · [maintenance](packages/extensions/docs/extensions/verbosity-control/maintenance.md) |
+| pi-mcp-adapter | [settings](packages/pi-mcp-adapter/docs/extensions/pi-mcp-adapter/settings.md) · [maintenance](packages/pi-mcp-adapter/docs/extensions/pi-mcp-adapter/maintenance.md) |
 | prompt-channels | [settings](packages/extensions/docs/extensions/prompt-channels/settings.md) · [maintenance](packages/extensions/docs/extensions/prompt-channels/maintenance.md) |
 | scheduler | [settings](packages/scheduler/docs/extensions/scheduler/settings.md) · [maintenance](packages/scheduler/docs/extensions/scheduler/maintenance.md) |
 | schedule_prompt (tool) | [settings](packages/scheduler/docs/tools/schedule_prompt/settings.md) · [maintenance](packages/scheduler/docs/tools/schedule_prompt/maintenance.md) |

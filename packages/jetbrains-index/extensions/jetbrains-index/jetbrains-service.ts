@@ -203,7 +203,6 @@ export type ToolCatalog = {
 	searchText: string | null;
 	findClass: string | null;
 	findSymbol: string | null;
-	findDefinition: string | null;
 	findReferences: string | null;
 	diagnostics: string | null;
 	indexStatus: string | null;
@@ -249,7 +248,6 @@ const ALL_TOOL_CANDIDATES: Record<JetBrainsToolKey, string[]> = {
 	searchText: ["ide_search_text", "jetbrains_index_ide_search_text"],
 	findClass: ["ide_find_class", "jetbrains_index_ide_find_class"],
 	findSymbol: ["ide_find_symbol", "jetbrains_index_ide_find_symbol"],
-	findDefinition: ["ide_find_definition", "jetbrains_index_ide_find_definition"],
 	findReferences: ["ide_find_references", "jetbrains_index_ide_find_references"],
 	diagnostics: ["ide_diagnostics", "jetbrains_index_ide_diagnostics"],
 	indexStatus: ["ide_index_status", "jetbrains_index_ide_index_status"],

@@ -1,6 +1,6 @@
 # @ineersa/my-pi-jetbrains-index
 
-[pi-coding-agent](https://github.com/badlogic/pi-mono) extension that provides **JetBrains IDE index–aware** first-class Pi wrapper tools, diagnostics, and guard behavior. Registers 14 IDE tools via Pi's custom tool API, provides IDE tool guidelines via tool `promptGuidelines`, blocks tools when the IDE/index is unavailable, syncs the project at turn start, and reports newly introduced diagnostics after code edits.
+[pi-coding-agent](https://github.com/badlogic/pi-mono) extension that provides **JetBrains IDE index–aware** first-class Pi wrapper tools, diagnostics, and guard behavior. Registers 13 IDE tools via Pi's custom tool API, provides IDE tool guidelines via tool `promptGuidelines`, blocks tools when the IDE/index is unavailable, syncs the project at turn start, and reports newly introduced diagnostics after code edits.
 
 ## Mandatory dependency
 
@@ -56,9 +56,9 @@ After every successful `edit` or `write`:
 3. Waits for index readiness.
 4. Runs diagnostics and reports **only newly introduced** issues (not pre-existing ones).
 
-### Move-refactor nudges
+### Move-refactor handling
 
-Detects `mv` / `git mv` in bash commands targeting files inside the current working directory and reminds the agent to prefer `ide_move_file` so imports/references are updated automatically.
+Detects `mv` / `git mv` in bash commands targeting files inside the current working directory, performs a whole-project IDE sync after the move, and reminds the agent to prefer `ide_move_file` so imports/references are updated automatically.
 
 ## States
 
@@ -78,7 +78,6 @@ jetbrains-index.ts       ← entry point, hooks, tool registration
 │   ├── tools/find-file.ts  ← ide_find_file
 │   ├── tools/search-text.ts  ← ide_search_text
 │   ├── tools/find-symbol.ts  ← ide_find_symbol
-│   ├── tools/find-definition.ts  ← ide_find_definition
 │   ├── tools/find-references.ts  ← ide_find_references
 │   ├── tools/rename-symbol.ts    ← ide_rename_symbol
 │   ├── tools/rename-file.ts      ← ide_rename_file
@@ -106,8 +105,8 @@ imports all tool factories and exports `createAllWrapperTools`.
 
 ### Key changes in v0.4.0
 
-- **First-class wrapper tools**: registers 14 Pi tools (`ide_find_file`,
-  `ide_search_text`, `ide_find_symbol`, `ide_find_definition`,
+- **First-class wrapper tools**: registers 13 Pi tools (`ide_find_file`,
+  `ide_search_text`, `ide_find_symbol`,
   `ide_find_references`, `ide_rename_symbol`, `ide_rename_file`, `ide_find_implementations`,
   `ide_find_super_methods`, `ide_type_hierarchy`, `ide_call_hierarchy`,
   `ide_diagnostics`, `ide_move_file`, `ide_file_structure`) on session start

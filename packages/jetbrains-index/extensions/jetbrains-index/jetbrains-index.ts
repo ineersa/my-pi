@@ -277,10 +277,22 @@ export default function jetbrainsIndexExtension(pi: ExtensionAPI): void {
 
 		const input = (event.input ?? {}) as Record<string, unknown>;
 
-		// Narrowed mv/git mv nudge — only when target is inside cwd
+		// Narrowed mv/git mv handling — only when target is inside cwd
 		if (event.toolName === "bash" && !event.isError) {
 			const command = getBashCommand(input);
 			if (command && isMoveCommand(command) && isMoveInsideCwd(command, ctx.cwd)) {
+				try {
+					const synced = await tracker.syncProject();
+					if (!synced && ctx.hasUI) {
+						ctx.ui.notify("⚠ Failed to sync IDE index after mv/git mv", "warning");
+					}
+				} catch (error) {
+					const message = error instanceof Error ? error.message : String(error);
+					if (ctx.hasUI) {
+						ctx.ui.notify(`⚠ Failed to sync IDE index after mv/git mv: ${message}`, "warning");
+					}
+				}
+
 				const now = Date.now();
 				if (now - lastMoveReminderAt >= NUDGE_COOLDOWN_MS) {
 					lastMoveReminderAt = now;

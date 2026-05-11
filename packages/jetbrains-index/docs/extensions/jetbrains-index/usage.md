@@ -23,8 +23,9 @@ When active, the extension provides:
      - Waits for index readiness.
      - Runs diagnostics and reports only newly introduced issues.
 
-5. **Move-refactor nudges**
+5. **Move-refactor handling**
    - Detects `mv` / `git mv` targeting files inside CWD.
+   - Syncs the whole project after the move so the IDE sees the filesystem change.
    - Nudges toward `ide_move_file` so imports/references are updated automatically.
 
 6. **First-class IDE wrapper tools**
@@ -35,7 +36,6 @@ When active, the extension provides:
 | `ide_find_file` | Search | Find files by name using the IDE index |
 | `ide_search_text` | Search | Search for exact words using the IDE word index |
 | `ide_find_symbol` | Search | Search for symbols (classes, methods, etc.) by name |
-| `ide_find_definition` | Semantic | Go to symbol definition |
 | `ide_find_references` | Semantic | Find all references to a symbol |
 | `ide_rename_symbol` | Semantic | Rename a symbol with automatic IDE refactoring |
 | `ide_rename_file` | Semantic | Rename a file with automatic IDE refactoring |

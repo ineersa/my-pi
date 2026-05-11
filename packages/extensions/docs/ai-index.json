@@ -137,17 +137,6 @@
       }
     },
     {
-      "id": "verbosity-control",
-      "kind": "extension",
-      "name": "verbosity-control",
-      "entry": "./extensions/verbosity-control/verbosity-control.ts",
-      "docs": {
-        "settings": "docs/extensions/verbosity-control/settings.md",
-        "usage": "docs/extensions/verbosity-control/settings.md",
-        "maintenance": "docs/extensions/verbosity-control/maintenance.md"
-      }
-    },
-    {
       "id": "prompt-channels",
       "kind": "extension",
       "name": "prompt-channels",

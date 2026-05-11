@@ -11,7 +11,6 @@ Core implementation files:
 - `extensions/jetbrains-index/tools/find-file.ts` — `createFindFile` (ide_find_file)
 - `extensions/jetbrains-index/tools/search-text.ts` — `createSearchText` (ide_search_text)
 - `extensions/jetbrains-index/tools/find-symbol.ts` — `createFindSymbol` (ide_find_symbol)
-- `extensions/jetbrains-index/tools/find-definition.ts` — `createDefinition` (ide_find_definition)
 - `extensions/jetbrains-index/tools/find-references.ts` — `createReferences` (ide_find_references)
 - `extensions/jetbrains-index/tools/rename-symbol.ts` — `createRenameSymbol` (ide_rename_symbol)
 - `extensions/jetbrains-index/tools/rename-file.ts` — `createRenameFile` (ide_rename_file)
@@ -43,7 +42,6 @@ jetbrains-index.ts                 ← entry point, hooks, tool registration
   │    ├─ tools/find-file.ts        ← ide_find_file
   │    ├─ tools/search-text.ts      ← ide_search_text
   │    ├─ tools/find-symbol.ts      ← ide_find_symbol
-  │    ├─ tools/find-definition.ts  ← ide_find_definition
   │    ├─ tools/find-references.ts  ← ide_find_references
   │    ├─ tools/rename-symbol.ts    ← ide_rename_symbol
   │    ├─ tools/rename-file.ts      ← ide_rename_file
@@ -86,7 +84,7 @@ When updating behavior, keep these invariants intact:
 - Post-mutation diagnostics continue to report only **new** issues (baseline diff) for built-in `edit`/`write`.
 - IDE mutation tools (`ide_rename_symbol`, `ide_rename_file`, `ide_move_file`) perform one whole-project sync after success and do **not** run diagnostics.
 - Diagnostics flow (edit/write): **open file → sync → wait for index → diagnostics**.
-- Move-refactor nudge only fires for `mv`/`git mv` targeting files inside CWD.
+- Move-refactor handling only fires for `mv`/`git mv` targeting files inside CWD and performs one whole-project sync after the shell move.
 
 ## What was removed in stage 1
 
@@ -107,6 +105,7 @@ When updating behavior, keep these invariants intact:
 3. Force dumb/indexing mode during a tool call:
    - tool should be **blocked**, user notified, agent run **aborted**.
 4. Run a `mv file` command inside CWD:
+   - the extension should perform one whole-project sync after the move.
    - a one-time move-refactor nudge should appear.
 5. Introduce a new code issue via edit:
    - post-edit diagnostics should include new issues summary (plain text, no system-reminder).

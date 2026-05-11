@@ -23,7 +23,7 @@ import type { ToolResult } from "./types.js";
  */
 export const IDE_PROMPT_GUIDELINES: readonly string[] = [
 	"Prefer IDE tools over bash/rg/find for code navigation and semantic operations in the current working directory.",
-	"Use ide_find_file, ide_find_symbol, ide_search_text, ide_file_structure, and ide_find_definition before broad filesystem reads or shell searches.",
+	"Use ide_find_file, ide_find_symbol, ide_search_text, and ide_file_structure before broad filesystem reads or shell searches.",
 
 	"Before answering code review, architecture, refactor-risk, or impact-analysis questions, gather IDE evidence instead of relying only on file reads.",
 	"Use ide_find_references before judging whether a symbol/API/function/class is safe to change or remove.",

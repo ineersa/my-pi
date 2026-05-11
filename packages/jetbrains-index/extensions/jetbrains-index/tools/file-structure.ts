@@ -19,7 +19,7 @@ export function createFileStructure(service: JetBrainsService): ToolRegistration
 		+ "methods, fields/constants, exports, Markdown headings, and nesting before "
 		+ "reading or editing the file.\n\n"
 		+ "This is a file outline tool, not a reference search or definition lookup. "
-		+ "Use ide_find_references for usages and ide_find_definition for declarations.\n\n"
+		+ "Use ide_find_references for usages.\n\n"
 		+ "Returns a formatted structure tree with symbol names, kinds, signatures, "
 		+ "nesting, and line numbers when provided by the IDE backend.\n\n"
 		+ "Examples: "
