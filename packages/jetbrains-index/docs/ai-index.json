@@ -21,15 +21,15 @@
         "configSource": "Pi settings.json (jetbrainsIndex key) with mcp.json fallback"
       },
       "behaviors": [
-        "Injects minimal IDE tool guidance into system prompt with targeting guidance (prefer file+line+column, symbol fallback, fileHint for JS/TS)",
+        "Injects IDE tool prompt guidelines into system prompt Guidelines section (prefer IDE tools over bash/rg/find, tool-specific usage guidance, CWD restriction)",
         "Loads JetBrains connection config from Pi settings.json (jetbrainsIndex key) with fallback to mcp.json",
         "Blocks any tool call when IDE/index becomes unavailable and aborts the agent run",
         "Syncs entire project at turn start and reports only newly introduced diagnostics",
         "Nudges toward IDE move refactoring on mv/git mv inside CWD",
         "Exposes internal JetBrainsService layer with 17-tool catalog, TOON helpers, and MCP tool metadata retention",
         "Provides target-resolution module (target-resolver.ts) that resolves symbol or location targets to canonical file/line/column for semantic tool wrappers",
-        "Registers first-class Pi wrapper tools (13 tools) on session start when IDE is available: ide_find_file, ide_search_text, ide_find_symbol, ide_find_definition, ide_find_references, ide_refactor_rename, ide_find_implementations, ide_find_super_methods, ide_type_hierarchy, ide_call_hierarchy, ide_diagnostics, ide_move_file, ide_file_structure",
-        "Mutation tools (ide_refactor_rename, ide_move_file) perform one whole-project sync after successful IDE mutation and do not run diagnostics"
+        "Registers first-class Pi wrapper tools (14 tools) on session start when IDE is available: ide_find_file, ide_search_text, ide_find_symbol, ide_find_definition, ide_find_references, ide_rename_symbol, ide_rename_file, ide_find_implementations, ide_find_super_methods, ide_type_hierarchy, ide_call_hierarchy, ide_diagnostics, ide_move_file, ide_file_structure",
+        "Mutation tools (ide_rename_symbol, ide_rename_file, ide_move_file) perform one whole-project sync after successful IDE mutation and do not run diagnostics"
       ]
     }
   ]

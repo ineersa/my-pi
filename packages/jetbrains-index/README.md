@@ -1,6 +1,6 @@
 # @ineersa/my-pi-jetbrains-index
 
-[pi-coding-agent](https://github.com/badlogic/pi-mono) extension that provides **JetBrains IDE index–aware** diagnostics and guard behavior. Injects minimal IDE tool guidance, blocks tools when the IDE/index is unavailable, syncs the project at turn start, and reports newly introduced diagnostics after code edits.
+[pi-coding-agent](https://github.com/badlogic/pi-mono) extension that provides **JetBrains IDE index–aware** first-class Pi wrapper tools, diagnostics, and guard behavior. Registers 14 IDE tools via Pi's custom tool API, provides IDE tool guidelines via tool `promptGuidelines`, blocks tools when the IDE/index is unavailable, syncs the project at turn start, and reports newly introduced diagnostics after code edits.
 
 ## Mandatory dependency
 
@@ -28,13 +28,9 @@ pi install ./packages/jetbrains-index -l
 
 ## What it does
 
-### Minimal IDE tool guidance
+### IDE tool prompt guidelines
 
-When active, injects a short prompt guideline:
-
-- Use JetBrains IDE tools for semantic code operations.
-- Use them only for targets inside the current working directory.
-- If the IDE/index becomes unavailable, stop and wait for the user to fix it and type continue.
+When active, each registered IDE wrapper tool contributes prompt guidelines to the system prompt `Guidelines` block via Pi's `promptGuidelines` mechanism. The guidelines direct the model to prefer IDE tools over bash/find/rg for code navigation, use specific tools for search/analysis/refactoring, and respect CWD scope.
 
 ### Hard stop on broken IDE/index
 
@@ -69,30 +65,52 @@ Detects `mv` / `git mv` in bash commands targeting files inside the current work
 | State | Behavior |
 |---|---|
 | **Dormant** | No `.idea/` or no healthy JetBrains MCP for `ctx.cwd`. Extension does nothing. |
-| **Active** | Health check passed. Prompt injection enabled. Guards active. |
+| **Active** | Health check passed. Prompt guidelines active. Guards active. |
 | **Blocked** | IDE/index broken mid-session. Tool blocked, user notified, agent aborted. Recovers on next turn after user fixes IDE and types `continue`. |
 
 ## Architecture
 
 ```
 jetbrains-index.ts       ← entry point, hooks, tool registration
-├── wrappers.ts           ← 12 first-class Pi wrapper tools
-│   ├── target-resolver.ts  ← symbol → file/line/column resolution
-│   └── jetbrains-service.ts  ← MCP client (17-tool catalog, TOON, metadata)
-│       └── settings-config.ts  ← config loader (settings.json + fallback)
+├── wrappers.ts           ← barrel/orchestrator (imports tools/*)
+│   ├── tools/types.ts    ← shared types (ToolResult, ToolRegistration)
+│   ├── tools/shared.ts   ← shared helpers (callTool, resolveAndMerge, etc.)
+│   ├── tools/find-file.ts  ← ide_find_file
+│   ├── tools/search-text.ts  ← ide_search_text
+│   ├── tools/find-symbol.ts  ← ide_find_symbol
+│   ├── tools/find-definition.ts  ← ide_find_definition
+│   ├── tools/find-references.ts  ← ide_find_references
+│   ├── tools/rename-symbol.ts    ← ide_rename_symbol
+│   ├── tools/rename-file.ts      ← ide_rename_file
+│   ├── tools/find-implementations.ts  ← ide_find_implementations
+│   ├── tools/find-super-methods.ts  ← ide_find_super_methods
+│   ├── tools/type-hierarchy.ts  ← ide_type_hierarchy
+│   ├── tools/call-hierarchy.ts  ← ide_call_hierarchy
+│   ├── tools/diagnostics.ts  ← ide_diagnostics
+│   ├── tools/move-file.ts  ← ide_move_file
+│   ├── tools/file-structure.ts  ← ide_file_structure
+│   └── tools/
+├── target-resolver.ts    ← symbol → file/line/column resolution
+├── jetbrains-service.ts  ← MCP client (17-tool catalog, TOON, metadata)
+│   └── settings-config.ts  ← config loader (settings.json + fallback)
 ├── problems-tracker.ts   ← baseline capture + new-problem diffing
 ├── prompts.ts            ← minimal IDE prompt + reminder builders
 ├── diagnostics.ts        ← diagnostics summary formatting
 ├── constants.ts          ← thresholds, cooldowns, regexes
-├── capabilities.ts       ← detect available IDE tools (legacy)
-└── tool-names.ts         ← tool name resolution (legacy)
+├── capabilities.ts       ← detect available IDE tools (dead code, kept for typecheck)
+└── tool-names.ts         ← tool name resolution (dead code, kept for typecheck)
 ```
+
+Each tool lives in its own file under `tools/`. Each file owns its registration,
+schema, descriptions, and execute logic. Shared helpers and types are in
+`tools/types.ts` and `tools/shared.ts`. `wrappers.ts` is a thin barrel that
+imports all tool factories and exports `createAllWrapperTools`.
 
 ### Key changes in v0.4.0
 
-- **First-class wrapper tools**: registers 12 Pi tools (`ide_find_file`,
+- **First-class wrapper tools**: registers 14 Pi tools (`ide_find_file`,
   `ide_search_text`, `ide_find_symbol`, `ide_find_definition`,
-  `ide_find_references`, `ide_refactor_rename`, `ide_find_implementations`,
+  `ide_find_references`, `ide_rename_symbol`, `ide_rename_file`, `ide_find_implementations`,
   `ide_find_super_methods`, `ide_type_hierarchy`, `ide_call_hierarchy`,
   `ide_diagnostics`, `ide_move_file`, `ide_file_structure`) on session start
   when IDE is available.
@@ -103,9 +121,9 @@ jetbrains-index.ts       ← entry point, hooks, tool registration
   from `tools/list`, enabling wrappers to reuse original descriptions.
 - **Resolver-backed semantic tools**: all semantic tools share a common
   targeting contract (file+line+column preferred, symbol fallback).
-- **Mutation lock**: `ide_refactor_rename` and `ide_move_file` serialize
+- **Mutation lock**: `ide_rename_symbol`, `ide_rename_file`, and `ide_move_file` serialize
   IDE-level mutations.
-- **Shared targeting guidance**: minimal prompt now includes targeting rules.
+- **Tool prompt guidelines**: IDE usage guidance contributed via `promptGuidelines` in the system prompt `Guidelines:` block.
 
 ### Key changes in v0.3.0
 
@@ -122,8 +140,7 @@ jetbrains-index.ts       ← entry point, hooks, tool registration
   into `JetBrainsService` — covers all JetBrains IDE tools in one catalog.
 - **Settings-based config**: connection config now loads from Pi
   `settings.json` (`jetbrainsIndex` key) with fallback to legacy `mcp.json`.
-- **TOON helpers**: service exposes `encodeForModel()` / `formatForModel()`
-  for token-efficient result encoding (future wrapper tools).
+- **Always-TOON responses**: all tool results are encoded as TOON text; `encodeForModel`/`formatForModel` replaced with always-TOON helpers.
 - **Cleaner API**: convenience methods (`waitForIndexReady`, `syncFiles`,
   `openFile`, `getFileDiagnostics`) no longer require explicit project path.
 

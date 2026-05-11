@@ -82,7 +82,7 @@ Key built-in limits/intervals:
 
 ## Tool expectations
 
-The extension is designed for JetBrains index IDE tools. When active, it injects a minimal prompt guideline to prefer IDE tools and only use them for targets inside the current working directory.
+The extension is designed for JetBrains index IDE tools. When active, each registered IDE wrapper tool contributes prompt guidelines to the system prompt Guidelines section, directing the model to prefer IDE tools over bash/find/rg, use specific tools for navigation/refactoring/hierarchy, and respect CWD scope.
 
 ## First-class wrapper tools
 
@@ -91,7 +91,7 @@ When active, the extension registers first-class Pi wrapper tools that replace r
 - Uses the original MCP tool description and parameter descriptions from the connected IDE server.
 - Returns results as TOON text in MCP-native result format.
 - Semantic tools share a common targeting contract: prefer `file + line + column` when known, otherwise use `symbol` (with `fileHint` for JS/TS).
-- Mutation tools (`ide_refactor_rename`, `ide_move_file`) are serialized through a shared lock. After a successful IDE mutation, they perform one whole-project sync and wait for index readiness. They do not run diagnostics — a whole-project sync is sufficient after multi-file refactors.
+- Mutation tools (`ide_rename_symbol`, `ide_rename_file`, `ide_move_file`) are serialized through a shared lock. After a successful IDE mutation, they perform one whole-project sync and wait for index readiness. They do not run diagnostics — a whole-project sync is sufficient after multi-file refactors.
 
 ### Public tool surface
 
@@ -102,7 +102,8 @@ When active, the extension registers first-class Pi wrapper tools that replace r
 | `ide_find_symbol` | findSymbol / findClass | Merged symbol search with kind filter |
 | `ide_find_definition` | findDefinition | Resolver-backed |
 | `ide_find_references` | findReferences | Resolver-backed |
-| `ide_refactor_rename` | rename | Resolver-backed, mutation-locked; syncs whole project after success, no diagnostics |
+| `ide_rename_symbol` | rename | Resolver-backed, mutation-locked; syncs whole project after success, no diagnostics |
+| `ide_rename_file` | rename | Not resolver-backed; mutation-locked; syncs whole project after success, no diagnostics |
 | `ide_find_implementations` | findImplementations | Resolver-backed |
 | `ide_find_super_methods` | findSuperMethods | Resolver-backed |
 | `ide_type_hierarchy` | typeHierarchy | Resolver-backed |

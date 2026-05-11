@@ -5,7 +5,6 @@ import { formatDiagnosticsSummary } from "./diagnostics.js";
 import {
 	buildMoveRefactorReminder,
 	buildNewDiagnosticsMessage,
-	MINIMAL_IDE_PROMPT,
 } from "./prompts.js";
 import {
 	MOVE_BASH_REGEX,
@@ -214,16 +213,6 @@ export default function jetbrainsIndexExtension(pi: ExtensionAPI): void {
 				);
 			}
 		}
-	});
-
-	pi.on("before_agent_start", (event) => {
-		if (!extensionActive) {
-			return;
-		}
-
-		return {
-			systemPrompt: `${event.systemPrompt}\n\n${MINIMAL_IDE_PROMPT}`,
-		};
 	});
 
 	pi.on("tool_call", async (event, ctx) => {

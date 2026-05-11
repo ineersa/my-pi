@@ -5,7 +5,23 @@
 Core implementation files:
 
 - `extensions/jetbrains-index/jetbrains-index.ts` — event hooks, guard orchestration, and wrapper tool registration
-- `extensions/jetbrains-index/wrappers.ts` — first-class Pi wrapper tool definitions (13 tools) backed by JetBrainsService and target-resolver
+- `extensions/jetbrains-index/wrappers.ts` — barrel/orchestrator importing per-tool factories and exporting `createAllWrapperTools`
+- `extensions/jetbrains-index/tools/types.ts` — shared type definitions (`ToolResult`, `ToolRegistration`, `ExecCtx`, `ContentBlock`)
+- `extensions/jetbrains-index/tools/shared.ts` — shared helpers (`callTool`, `resolveAndMerge`, `withMutationLock`, `TargetParams`, metadata helpers)
+- `extensions/jetbrains-index/tools/find-file.ts` — `createFindFile` (ide_find_file)
+- `extensions/jetbrains-index/tools/search-text.ts` — `createSearchText` (ide_search_text)
+- `extensions/jetbrains-index/tools/find-symbol.ts` — `createFindSymbol` (ide_find_symbol)
+- `extensions/jetbrains-index/tools/find-definition.ts` — `createDefinition` (ide_find_definition)
+- `extensions/jetbrains-index/tools/find-references.ts` — `createReferences` (ide_find_references)
+- `extensions/jetbrains-index/tools/rename-symbol.ts` — `createRenameSymbol` (ide_rename_symbol)
+- `extensions/jetbrains-index/tools/rename-file.ts` — `createRenameFile` (ide_rename_file)
+- `extensions/jetbrains-index/tools/find-implementations.ts` — `createImplementations` (ide_find_implementations)
+- `extensions/jetbrains-index/tools/find-super-methods.ts` — `createSuperMethods` (ide_find_super_methods)
+- `extensions/jetbrains-index/tools/type-hierarchy.ts` — `createTypeHierarchy` (ide_type_hierarchy)
+- `extensions/jetbrains-index/tools/call-hierarchy.ts` — `createCallHierarchy` (ide_call_hierarchy)
+- `extensions/jetbrains-index/tools/diagnostics.ts` — `createDiagnostics` (ide_diagnostics)
+- `extensions/jetbrains-index/tools/move-file.ts` — `createMoveFile` (ide_move_file)
+- `extensions/jetbrains-index/tools/file-structure.ts` — `createFileStructure` (ide_file_structure)
 - `extensions/jetbrains-index/jetbrains-service.ts` — generic JetBrains MCP service layer (transport, catalog, retries, TOON helpers, MCP tool metadata)
 - `extensions/jetbrains-index/target-resolver.ts` — target-resolution layer: resolves symbol/location inputs to canonical file/line/column for semantic wrapper tools
 - `extensions/jetbrains-index/problems-tracker.ts` — pre/post mutation diagnostics lifecycle, uses JetBrainsService
@@ -19,13 +35,35 @@ Core implementation files:
 
 ```
 jetbrains-index.ts                 ← entry point, hooks, tool registration
-  ├─ wrappers.ts                    ← 13 first-class Pi wrapper tools
-  │    ├─ target-resolver.ts        ← symbol → file/line/column resolution
-  │    └─ jetbrains-service.ts      ← MCP client (17-tool catalog, TOON, metadata)
-  │         └─ settings-config.ts   ← config loader
+  ├─ wrappers.ts                    ← barrel/orchestrator (imports tools/*)
+  │    ├─ tools/types.ts            ← shared types (ToolResult, ToolRegistration)
+  │    ├─ tools/shared.ts           ← shared helpers (callTool, resolveAndMerge, etc.)
+  │    ├─ tools/find-file.ts        ← ide_find_file
+  │    ├─ tools/search-text.ts      ← ide_search_text
+  │    ├─ tools/find-symbol.ts      ← ide_find_symbol
+  │    ├─ tools/find-definition.ts  ← ide_find_definition
+  │    ├─ tools/find-references.ts  ← ide_find_references
+  │    ├─ tools/rename-symbol.ts    ← ide_rename_symbol
+  │    ├─ tools/rename-file.ts      ← ide_rename_file
+  │    ├─ tools/find-implementations.ts → ide_find_implementations
+  │    ├─ tools/find-super-methods.ts   → ide_find_super_methods
+  │    ├─ tools/type-hierarchy.ts   ← ide_type_hierarchy
+  │    ├─ tools/call-hierarchy.ts   ← ide_call_hierarchy
+  │    ├─ tools/diagnostics.ts      ← ide_diagnostics
+  │    ├─ tools/move-file.ts        ← ide_move_file
+  │    ├─ tools/file-structure.ts   ← ide_file_structure
+  │    └─ tools/
+  ├─ target-resolver.ts             ← symbol → file/line/column resolution
+  ├─ jetbrains-service.ts           ← MCP client (17-tool catalog, TOON, metadata)
+  │    └─ settings-config.ts        ← config loader
   └─ problems-tracker.ts
        └─ jetbrains-service.ts
 ```
+
+Per-tool files are under `tools/`. Each file owns its registration, schema,
+descriptions, and execute logic. Shared helpers and types live in `tools/types.ts`
+and `tools/shared.ts`. `wrappers.ts` is a thin barrel that imports all tool
+factories and exports `createAllWrapperTools`.
 
 Wrapper tools are registered at session start when IDE is available.
 Resolver-backed semantic tools use `target-resolver.ts` before calling the
@@ -40,7 +78,7 @@ When updating behavior, keep these invariants intact:
 - If health check fails after retries, tool is **blocked**, user is **notified**, agent run is **aborted**.
 - On `turn_start`, IDE health is checked and the whole project is **synced**.
 - Post-mutation diagnostics continue to report only **new** issues (baseline diff) for built-in `edit`/`write`.
-- IDE mutation tools (`ide_refactor_rename`, `ide_move_file`) perform one whole-project sync after success and do **not** run diagnostics.
+- IDE mutation tools (`ide_rename_symbol`, `ide_rename_file`, `ide_move_file`) perform one whole-project sync after success and do **not** run diagnostics.
 - Diagnostics flow (edit/write): **open file → sync → wait for index → diagnostics**.
 - Move-refactor nudge only fires for `mv`/`git mv` targeting files inside CWD.
 

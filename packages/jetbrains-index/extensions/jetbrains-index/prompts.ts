@@ -1,16 +1,3 @@
-/**
- * Minimal prompt injection for JetBrains IDE tool usage.
- * Plain text, not wrapped in <system-reminder>.
- */
-export const MINIMAL_IDE_PROMPT = [
-	"JetBrains IDE tool guidelines:",
-	"- Use JetBrains IDE tools for semantic code operations.",
-	"- Use them only for targets inside the current working directory.",
-	"- If the IDE/index becomes unavailable, stop and wait for the user to fix it and type continue.",
-	"- Prefer file + line + column when known for semantic tools.",
-	"- Otherwise use symbol. For JS/TS symbol lookups, prefer fileHint.",
-].join("\n");
-
 export function wrapSystemReminder(content: string): string {
 	return `<system-reminder>\n${content}\n</system-reminder>`;
 }
