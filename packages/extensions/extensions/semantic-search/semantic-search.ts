@@ -32,6 +32,7 @@ interface WatcherEntry {
 
 let currentWatcher: WatcherEntry | null = null;
 let ensureCwdIndexPromise: Promise<{ ok: boolean; error?: string }> | null = null;
+let shuttingDown = false;
 
 // ─── Shell helpers ──────────────────────────────────────────────────────
 
@@ -98,9 +99,30 @@ function runVera(
 	});
 }
 
+// ─── Preflight check ───────────────────────────────────────────────────
+
+/**
+ * Fire-and-forget check that vera is available on PATH.
+ * Notifies the user via TUI if missing.
+ */
+function preflightVeraAvailable(
+	notify: (msg: string, level: "info" | "warning" | "error") => void,
+): void {
+	const child = spawn("bash", ["-c", "command -v vera"], {
+		stdio: ["ignore", "ignore", "pipe"],
+	});
+	const warn = () =>
+		notify("⚠ Vera binary not found on PATH. Install vera to enable semantic search.", "warning");
+	child.on("error", warn);
+	child.on("close", (code) => {
+		if (code !== 0) warn();
+	});
+}
+
 // ─── Watcher management ─────────────────────────────────────────────────
 
-function stopWatcher(): void {
+function stopWatcher(enterShutdown = true): void {
+	shuttingDown = enterShutdown;
 	const w = currentWatcher;
 	currentWatcher = null;
 	if (!w) return;
@@ -119,12 +141,13 @@ function spawnWatcher(
 	notify: (msg: string, level: "info" | "warning" | "error") => void,
 	restartCount = 0,
 ): void {
+	if (shuttingDown) return;
 	// Don't start if already watching this directory with a live process
 	if (currentWatcher && currentWatcher.cwd === targetDir && !currentWatcher.child.killed) {
 		return;
 	}
 
-	stopWatcher();
+	stopWatcher(false);
 
 	const bashCmd = veraCommand(targetDir, ["watch", "."]);
 	const child = spawn("bash", ["-c", bashCmd], {
@@ -153,6 +176,13 @@ function spawnWatcher(
 		const w = currentWatcher;
 		const tail = stderrAcc.slice(-600);
 
+		// Clean exit (code 0) or signal termination (null) — no restart
+		if (code === 0 || code === null) {
+			currentWatcher = null;
+			return;
+		}
+
+		// Only restart on actual failures (non-zero exit)
 		if (w.restartCount < MAX_RESTARTS) {
 			const nextRestartCount = w.restartCount + 1;
 			const delay = RESTART_DELAYS_MS[w.restartCount] ?? RESTART_DELAYS_MS[RESTART_DELAYS_MS.length - 1];
@@ -181,6 +211,7 @@ function spawnWatcher(
 }
 
 function startWatcherForCwd(cwd: string, ctx: ExtensionContext): void {
+	shuttingDown = false;
 	if (!existsSync(resolve(cwd, ".vera"))) return;
 	const notify = ctx.hasUI ? ctx.ui.notify.bind(ctx.ui) : () => {};
 	spawnWatcher(cwd, notify);
@@ -243,7 +274,7 @@ const SemanticSearchParams = Type.Object({
 	lang: Type.Optional(
 		Type.String({
 			description:
-				"Optional language filter (examples: \"ts\", \"rust\", \"py\", \"md\"); omitted searches all languages.",
+				"Optional language filter (examples: \"typescript\", \"rust\", \"python\", \"markdown\"); omitted searches all languages.",
 		}),
 	),
 	path: Type.Optional(
@@ -285,6 +316,7 @@ const SemanticSearchParams = Type.Object({
 			description: "Max number of results to return (1..100)",
 			minimum: 1,
 			maximum: 100,
+			default: 5,
 		}),
 	),
 });
@@ -294,6 +326,8 @@ const SemanticSearchParams = Type.Object({
 export default function semanticSearchExtension(pi: ExtensionAPI): void {
 	// ── Lifecycle: start watcher on session start (if .vera exists) ─────
 	pi.on("session_start", (_event, ctx) => {
+		const notify = ctx.hasUI ? ctx.ui.notify.bind(ctx.ui) : () => {};
+		preflightVeraAvailable(notify);
 		startWatcherForCwd(ctx.cwd, ctx);
 	});
 
@@ -337,6 +371,15 @@ export default function semanticSearchExtension(pi: ExtensionAPI): void {
 			let targetDir = cwd;
 			if (typeof p.cwd === "string" && p.cwd.trim()) {
 				targetDir = isAbsolute(p.cwd) ? p.cwd : resolve(cwd, p.cwd);
+			}
+
+			// ── Check target directory exists ──────────────────────────
+			if (!existsSync(targetDir)) {
+				return {
+					content: [{ type: "text" as const, text: `Directory does not exist: ${targetDir}` }],
+					isError: true,
+					details: {},
+				};
 			}
 
 			// ── Auto-index for current workspace only ──────────────────
@@ -384,7 +427,16 @@ export default function semanticSearchExtension(pi: ExtensionAPI): void {
 			args.push("--limit", String(limit));
 
 			// ── Run search ──────────────────────────────────────────────
-			const result = await runVera(targetDir, args, signal, 60_000);
+			let result: Awaited<ReturnType<typeof runVera>>;
+			try {
+				result = await runVera(targetDir, args, signal, 60_000);
+			} catch (err: unknown) {
+				return {
+					content: [{ type: "text" as const, text: `Search failed: ${err instanceof Error ? err.message : String(err)}` }],
+					isError: true,
+					details: {},
+				};
+			}
 
 			if (result.code !== 0) {
 				const msg = result.stderr || `exit code ${result.code}`;
