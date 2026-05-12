@@ -1,6 +1,6 @@
 {
   "name": "pi-subagents",
-  "version": "0.17.1",
+  "version": "0.17.2",
   "description": "Pi extension for delegating tasks to subagents with single and parallel foreground execution",
   "type": "module",
   "keywords": [
