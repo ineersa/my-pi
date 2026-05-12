@@ -192,6 +192,26 @@ export function withMutationLock<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 // ---------------------------------------------------------------------------
+// File structure lock — serializes parallel ide_file_structure calls
+// Separate from mutation lock to avoid unnecessary blocking.
+// ---------------------------------------------------------------------------
+
+let fileStructureLock: Promise<void> = Promise.resolve();
+
+/**
+ * Serialize parallel ide_file_structure calls through a private queue.
+ * Does NOT share the mutation lock — file structure is a read-only tool.
+ */
+export function withFileStructureLock<T>(fn: () => Promise<T>): Promise<T> {
+	const prev = fileStructureLock;
+	let release: () => void;
+	fileStructureLock = new Promise<void>((resolve) => {
+		release = resolve;
+	});
+	return prev.then(() => fn().finally(() => release!()));
+}
+
+// ---------------------------------------------------------------------------
 // Shared targeting params (wrapper-only, NOT from MCP metadata)
 // ---------------------------------------------------------------------------
 

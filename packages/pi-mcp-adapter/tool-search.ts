@@ -282,7 +282,17 @@ To load a tool: search by keywords, or use "select:server__toolname" to load a s
   return desc;
 }
 
+export function buildToolSearchGuidelines(state: McpExtensionState | null): string[] {
+  const deferredNames = state
+    ? getAllDeferredTools(state).map(tool => tool.name).sort((a, b) => a.localeCompare(b))
+    : [];
 
+  return [
+    "Use ToolSearch before calling deferred MCP tools. ToolSearch can directly load exact server__tool names.",
+    "Use ToolSearch({ query: \"keywords\" }) to search, or ToolSearch({ query: \"select:server__tool1,server__tool2\" }) to load exact comma-separated tools.",
+    `ToolSearch available deferred server__tool names: ${deferredNames.length > 0 ? deferredNames.join(", ") : "(none)"}`,
+  ];
+}
 
 // ---------------------------------------------------------------------------
 // ToolSearch tool definition
@@ -298,11 +308,14 @@ export function createToolSearchTool(
   getState: () => McpExtensionState | null,
   pi: ExtensionAPI,
 ) {
+  const state = getState();
+
   return {
     name: "ToolSearch",
     label: "MCP ToolSearch",
-    description: buildToolSearchDescription(getState()),
-    promptSnippet: "Search and load MCP tools on demand",
+    description: buildToolSearchDescription(state),
+    promptSnippet: "Search and load deferred MCP tools",
+    promptGuidelines: buildToolSearchGuidelines(state),
     parameters: Type.Object({
       query: Type.String({
         description:

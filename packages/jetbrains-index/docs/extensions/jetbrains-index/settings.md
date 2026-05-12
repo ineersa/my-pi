@@ -109,7 +109,7 @@ When active, the extension registers first-class Pi wrapper tools that replace r
 | `ide_call_hierarchy` | callHierarchy | Resolver-backed |
 | `ide_diagnostics` | diagnostics | Internal: open file + sync + wait + diagnostics |
 | `ide_move_file` | moveFile | Mutation-locked; syncs whole project after success, no diagnostics |
-| `ide_file_structure` | fileStructure | Thin passthrough wrapper |
+| `ide_file_structure` | fileStructure | Serialized queue (parallel-safe); one retry with jitter on failure |
 
 ## Target resolution
 

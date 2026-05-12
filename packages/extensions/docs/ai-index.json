@@ -146,6 +146,17 @@
         "usage": "docs/extensions/prompt-channels/settings.md",
         "maintenance": "docs/extensions/prompt-channels/maintenance.md"
       }
+    },
+    {
+      "id": "semantic-search",
+      "kind": "extension",
+      "name": "semantic-search",
+      "entry": "./extensions/semantic-search/semantic-search.ts",
+      "docs": {
+        "settings": "docs/extensions/semantic-search/settings.md",
+        "usage": "docs/extensions/semantic-search/usage.md",
+        "maintenance": "docs/extensions/semantic-search/maintenance.md"
+      }
     }
   ]
 }

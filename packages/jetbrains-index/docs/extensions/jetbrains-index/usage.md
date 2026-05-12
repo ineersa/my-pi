@@ -45,7 +45,7 @@ When active, the extension provides:
 | `ide_call_hierarchy` | Semantic | Show call hierarchy (callers/callees) |
 | `ide_diagnostics` | Diagnostics | Get IDE diagnostics for a project-relative file (optional `level`: `errors`|`warnings`|`all`) |
 | `ide_move_file` | Refactor | Move a file and update all references/imports |
-| `ide_file_structure` | Navigation | Show file structure overview |
+| `ide_file_structure` | Navigation | Show file structure overview (parallel-safe; serialized queue + retry) |
 
 ## Mutation behavior for IDE refactor tools
 

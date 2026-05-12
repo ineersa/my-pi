@@ -2,10 +2,14 @@
  * ide_file_structure — thin passthrough wrapper for IDE file structure view.
  *
  * Description and param descriptions are curated (not from MCP metadata).
+ *
+ * Parallel calls are serialized through a private queue (withFileStructureLock)
+ * to avoid MCP backend race conditions. On transient failure, one retry
+ * with random jitter (150-300ms) is attempted inside the queue.
  */
 import { Type } from "@sinclair/typebox";
 import { JetBrainsService } from "../jetbrains-service.js";
-import { callTool } from "./shared.js";
+import { callTool, withFileStructureLock } from "./shared.js";
 import type { ToolRegistration } from "./types.js";
 
 export function createFileStructure(service: JetBrainsService): ToolRegistration {
@@ -34,7 +38,23 @@ export function createFileStructure(service: JetBrainsService): ToolRegistration
 		promptSnippet: "Show IDE file structure overview with symbols, nesting, and line numbers",
 		parameters: params,
 		async execute(_id, params, _signal, _onUpdate, _ctx) {
-			return callTool(service, "fileStructure", params as Record<string, unknown>);
+			return withFileStructureLock(async () => {
+				const args = params as Record<string, unknown>;
+
+				// First attempt
+				const first = await callTool(service, "fileStructure", args);
+
+				// If no error, return immediately
+				if (!first.isError) {
+					return first;
+				}
+
+				// Transient failure — jittered retry once
+				const jitter = 150 + Math.floor(Math.random() * 151); // 150-300ms
+				await new Promise((resolve) => setTimeout(resolve, jitter));
+
+				return callTool(service, "fileStructure", args);
+			});
 		},
 	};
 }

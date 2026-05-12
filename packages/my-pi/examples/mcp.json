@@ -11,7 +11,7 @@
         "CONTEXT7_API_KEY": "${CONTEXT7_API_KEY}"
       }
     },
-    "websearch": {
+    "browser": {
       "url": "http://127.0.0.1:9001/sse"
     }
   }

@@ -7,7 +7,7 @@
     "librarian": {
       "url": "http://192.168.2.38:8093/_mcp?token=mcp_dd91c07fa288fae3c26334aaffb11249c97d1473f57ad2b7"
     },
-    "websearch": {
+    "browser": {
       "url": "http://192.168.2.38:9001/sse"
     }
   }

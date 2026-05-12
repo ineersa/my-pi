@@ -20,7 +20,8 @@
       "./extensions/output-cap/output-cap.ts",
       "./extensions/fork/fork.ts",
       "./extensions/ide/ide.ts",
-      "./extensions/prompt-channels/prompt-channels.ts"
+      "./extensions/prompt-channels/prompt-channels.ts",
+      "./extensions/semantic-search/semantic-search.ts"
     ]
   },
   "files": [
