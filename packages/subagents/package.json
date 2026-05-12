@@ -1,12 +1,18 @@
 {
-  "name": "pi-subagents",
-  "version": "0.17.2",
-  "description": "Pi extension for delegating tasks to subagents with single and parallel foreground execution",
+  "name": "@ineersa/my-pi-subagents",
+  "version": "0.1.0",
+  "description": "Subagent orchestration extension for Pi coding agent — single and parallel foreground execution, agent discovery, skill injection, model fallback",
   "type": "module",
   "keywords": [
-    "pi-package"
+    "pi-package",
+    "pi-coding-agent",
+    "subagents",
+    "orchestration"
   ],
-  "author": "Nico Bailon",
+  "author": "ineersa",
+  "contributors": [
+    "Nico Bailon"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
