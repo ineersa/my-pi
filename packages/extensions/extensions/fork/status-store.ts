@@ -6,7 +6,7 @@
  *
  * Responsibilities:
  * - Create/update/complete/fail runs
- * - Enforce MAX_CONCURRENT_FORKS = 1 per working directory (cwd)
+ * - Enforce MAX_CONCURRENT_FORKS = 3 per working directory (cwd)
  * - Reap stale/orphaned runs on a time-based threshold
  */
 
@@ -42,7 +42,7 @@ export type ForkRunState = ForkRunStatus["state"];
 
 // ─── Constants ─────────────────────────────────────────────────────────
 
-export const MAX_CONCURRENT_FORKS = 1;
+export const MAX_CONCURRENT_FORKS = 3;
 
 /** Runs with no update for longer than this are considered orphaned. */
 const STALE_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes

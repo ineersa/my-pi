@@ -19,9 +19,9 @@ Notes:
 | `cost.ts` | Cost aggregation across session entries and fork result usages. Provides `aggregateInclusiveCost` and `formatForkCostStatus` for the `forks +$...` footer |
 | `session-result.ts` | Session file result parser — reads child Pi's `session.jsonl` after exit and extracts final output, usage, model metadata. Older/supplemental to the `result.json` artifact path |
 | `types.ts` | Shared type definitions: `ForkResult`, `ForkToolExecution`, `ForkThinkingState`, `ForkActivity`, `ForkRetryState`, `UsageStats`, `ForkDetails`. Also normalization helpers: `normalizeCompletedResult`, `isResultSuccess`, `isResultError` |
-| `status-store.ts` | Persistent run status store under `~/.pi/agent/extensions/fork/runs/<runId>/`. Enforces `MAX_CONCURRENT_FORKS = 1` per working directory (`cwd`), stale-run reaping (30-min threshold), `createRun`/`updateRun`/`completeRun`/`failRun`/`countRunningForks`/`listRuns` |
+| `status-store.ts` | Persistent run status store under `~/.pi/agent/extensions/fork/runs/<runId>/`. Enforces `MAX_CONCURRENT_FORKS = 3` per working directory (`cwd`), stale-run reaping (30-min threshold), `createRun`/`updateRun`/`completeRun`/`failRun`/`countRunningForks`/`listRuns` |
 | `env.ts` | `buildChildEnv` — builds child process environment from configured overrides, always forces `PI_OFFLINE=1` and `PI_FORK=1` |
-| `tmux.ts` | Tmux pane management: `createForkPane` (right-side horizontal split, `main-vertical` layout restore), `killPane`, `paneExists`, `sendCtrlCToPane`, `startPaneLogPipe`, `stopPaneLogPipe`, `getPanePid` |
+| `tmux.ts` | Tmux pane management: `createForkPane` (2x2 grid, 50/50 split layout), `killPane`, `paneExists`, `sendCtrlCToPane`, `startPaneLogPipe`, `stopPaneLogPipe`, `getPanePid` |
 | `plans/` | Design documents for the tmux-interactive fork rewrite |
 
 ## Environment variables forced on fork children
@@ -42,13 +42,13 @@ When `runFork` launches a child:
 3. A tmux launch script (`fork.tmux.sh`) is generated with `PI_FORK=1`, `PI_FORK_RESULT_PATH`, `PI_FORK_TASK`, and the `pi --session <sessionPath> <task>` command.
 4. The pane log is piped to `pane.log`.
 5. The child writes `result.json` on `agent_end` via `writeForkChildResult()`.
-6. The parent polls the pane log for the `__FORK_EXIT__:<code>` marker, then reads `result.json` with retries (up to 2s).
+6. The parent polls the pane log for a run-specific `__PI_FORK_EXIT_<runId>__:<code>` marker, then reads `result.json` with retries (up to 2s).
 7. The pane is auto-closed (wait mode) or left for observation (background mode).
 8. If no result artifact is found, a synthetic failure `ForkResult` is constructed.
 
 ## Concurrency
 
-- `MAX_CONCURRENT_FORKS = 1` in `status-store.ts`, enforced per working directory (`cwd`).
+- `MAX_CONCURRENT_FORKS = 3` in `status-store.ts`, enforced per working directory (`cwd`). Up to 3 concurrent forks per cwd.
 - Stale runs (no update for 30+ minutes) are reaped lazily before `countRunningForks()`.
 - Background forks continue running even after the parent tool call completes; they deliver results via `pi.sendUserMessage`.
 

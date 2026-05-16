@@ -1,8 +1,8 @@
 # Pi Fork
 
-Interactive tmux-based fork tool for Pi. Spawns a visible child Pi session in a
-right-side tmux pane, auto-exits on completion, and returns dense result summaries
-without polluting the parent context window.
+Interactive tmux-based fork tool for Pi. Spawns visible child Pi sessions in a
+2x2 tmux grid (main Pi stays top-left), auto-exits on completion, and returns
+dense result summaries without polluting the parent context window.
 
 Originally created in [`elpapi42/pi-fork`](https://github.com/elpapi42/pi-fork).
 This copy is vendored into `@ineersa/my-pi-extensions` for installation through
@@ -157,7 +157,14 @@ forks. Disable the extra footer line with:
 
 ## Concurrency
 
-Only **1 concurrent fork per working directory** is allowed. Attempting a second fork from the same project while one is active returns an error immediately. Forks in different working directories can run at the same time. Stale/orphaned runs (no update for 30+ minutes) are automatically reaped.
+Up to **3 concurrent forks per working directory** are allowed. The 2x2 grid layout:
+- 1st fork: splits the main pane vertically (50/50) — main left, fork right.
+- 2nd fork: splits the existing right fork pane horizontally — 2 panes stacked right.
+- 3rd fork: splits the main/left pane horizontally — 2x2 grid, main Pi stays top-left.
+
+Attempting a 4th fork from the same cwd while 3 are active returns an error immediately.
+Forks in different working directories can run at the same time. Stale/orphaned runs
+(no update for 30+ minutes) are automatically reaped.
 
 ## Requirements
 

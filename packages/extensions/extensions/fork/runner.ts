@@ -32,7 +32,7 @@ import {
   tmuxOrThrow,
 } from "./tmux.js";
 
-const TMUX_EXIT_MARKER = "__FORK_EXIT__:";
+const TMUX_EXIT_MARKER_PREFIX = "__PI_FORK_EXIT_";
 const POLL_INTERVAL_MS = 250;
 const PANE_DISAPPEARED_GRACE_MS = 500;
 const AUTO_CLOSE_PANE_DELAY_MS = 750;
@@ -49,6 +49,10 @@ export interface RunForkOptions {
   signal?: AbortSignal;
   onUpdate?: (partial: unknown) => void;
   runId?: string;
+  /** tmux pane IDs of other currently running forks from this parent session, for 2x2 grid layout. */
+  existingForkPaneIds?: string[];
+  /** Count of other running forks from this parent session, including runs whose pane ID is not recorded yet. */
+  existingForkCount?: number;
 }
 
 function resolvePiSpawn(): { command: string; prefixArgs: string[] } {
@@ -313,6 +317,7 @@ function buildTmuxScript(input: {
   resultPath: string;
   pidPath: string;
   task: string;
+  exitMarkerPrefix: string;
 }): string {
   const {
     cwd,
@@ -323,6 +328,7 @@ function buildTmuxScript(input: {
     resultPath,
     pidPath,
     task,
+    exitMarkerPrefix,
   } = input;
   const lines: string[] = [];
   lines.push("#!/usr/bin/env bash");
@@ -359,15 +365,18 @@ function buildTmuxScript(input: {
 
   // Print exit marker for parent polling
   lines.push("code=$?");
-  lines.push(`printf '\\n${TMUX_EXIT_MARKER}%s\\n' "$code"`);
+  lines.push(`printf '\\n${exitMarkerPrefix}%s\\n' "$code"`);
   lines.push("exit \"$code\"");
   return lines.join("\n") + "\n";
 }
 
-function extractExitCodeFromLog(log: string): number | undefined {
-  const matches = Array.from(log.matchAll(new RegExp(TMUX_EXIT_MARKER.replace(":", "\\:") + "(-?\\d+)", "g")));
-  if (matches.length === 0) return undefined;
-  return Number(matches[matches.length - 1][1]);
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function makeExitMarkerPrefix(runId?: string): string {
+  const suffix = (runId && runId.trim()) || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return `${TMUX_EXIT_MARKER_PREFIX}${suffix.replace(/[^a-zA-Z0-9_-]/g, "_")}__:`;
 }
 
 function readPidFile(pidPath: string): number | undefined {
@@ -403,22 +412,24 @@ async function waitForTmuxExit(
   paneId?: string,
   signal?: AbortSignal,
   onPid?: (pid: number) => void,
+  exitMarkerPrefix: string = makeExitMarkerPrefix(),
 ): Promise<WaitForForkExitResult> {
   let offset = 0;
   let carry = "";
   let exitCode: number | undefined;
   let childPid: number | undefined;
+  const exitMarkerPattern = new RegExp(escapeRegExp(exitMarkerPrefix) + "(-?\\d+)");
 
   const parseChunk = (chunk: string): void => {
     const combined = carry + chunk;
     const lines = combined.split(/\r?\n/);
     carry = lines.pop() ?? "";
     for (const line of lines) {
-      const match = line.match(new RegExp(TMUX_EXIT_MARKER.replace(":", "\\:") + "(-?\\d+)"));
+      const match = line.match(exitMarkerPattern);
       if (match) exitCode = Number(match[1]);
     }
-    if (carry.includes(TMUX_EXIT_MARKER)) {
-      const carryMatch = carry.match(new RegExp(TMUX_EXIT_MARKER.replace(":", "\\:") + "(-?\\d+)"));
+    if (carry.includes(exitMarkerPrefix)) {
+      const carryMatch = carry.match(exitMarkerPattern);
       if (carryMatch) exitCode = Number(carryMatch[1]);
     }
   };
@@ -553,7 +564,17 @@ function makeMissingResultArtifactFailure(
  * file and exit code.
  */
 export async function runFork(opts: RunForkOptions): Promise<ForkResult> {
-  const { cwd, task, forkSessionSnapshotJsonl, model, thinking, signal, runId } = opts;
+  const {
+    cwd,
+    task,
+    forkSessionSnapshotJsonl,
+    model,
+    thinking,
+    signal,
+    runId,
+    existingForkPaneIds,
+    existingForkCount,
+  } = opts;
 
   if (!forkSessionSnapshotJsonl.trim()) {
     return {
@@ -590,6 +611,7 @@ export async function runFork(opts: RunForkOptions): Promise<ForkResult> {
   const resultPath = runId
     ? getRunArtifactPath(runId, "result.json")
     : path.join(runDir, "result.json");
+  const exitMarkerPrefix = makeExitMarkerPrefix(runId);
 
   let paneId: string | undefined;
   let windowId: string | undefined;
@@ -614,11 +636,12 @@ export async function runFork(opts: RunForkOptions): Promise<ForkResult> {
       resultPath,
       pidPath,
       task,
+      exitMarkerPrefix,
     });
     fs.writeFileSync(scriptPath, script, { mode: 0o700 });
 
     // Create the tmux sidecar pane
-    const pane = createForkPane();
+    const pane = createForkPane(existingForkPaneIds, existingForkCount);
     paneId = pane.paneId;
     windowId = pane.windowId;
     sessionName = pane.sessionName;
@@ -673,6 +696,7 @@ export async function runFork(opts: RunForkOptions): Promise<ForkResult> {
         childPid = pid;
         if (runId) updateRun(runId, { pid });
       },
+      exitMarkerPrefix,
     );
     childPid ??= waitResult.childPid;
 

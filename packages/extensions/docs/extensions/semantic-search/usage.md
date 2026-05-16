@@ -14,15 +14,17 @@ Registers the `semantic-search` tool for conceptual/semantic codebase search pow
 - File name search → use `ide_find_file` or glob patterns
 - Pattern/regex search → use `ide_search_text` or `grep`
 
-## Auto-indexing
+## Indexing
 
-When used in the current workspace and no Vera index exists, the tool runs
-`vera index .` once, then proceeds with the search. The watcher (`vera watch .`)
-also starts automatically to keep the index up to date. If it crashes, it retries
-up to 5 times with backoff, then surfaces the error in the TUI.
+The tool never creates or updates a Vera index automatically. If the target has
+no `.vera` directory, it returns an error and tells you to run `vera index .`
+manually from that repository first.
+
+The extension also does not start `vera watch .`; run it yourself when you want
+live index updates.
 
 ## External repositories
 
 Pass `cwd` to search another Vera-indexed repository. Relative paths resolve
 against the current workspace. If the target has no `.vera` directory, the tool
-returns an error — no auto-indexing for external repos.
+returns an error.

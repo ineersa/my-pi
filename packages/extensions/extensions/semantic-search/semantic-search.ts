@@ -8,31 +8,12 @@
  * invocations are wrapped in `bash -c 'cd <dir> && vera ...'`.
  */
 
-import { spawn, type ChildProcess } from "node:child_process";
+import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { resolve, isAbsolute } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import { StringEnum } from "@mariozechner/pi-ai";
-
-// ─── Constants ──────────────────────────────────────────────────────────
-
-const MAX_RESTARTS = 5;
-const RESTART_DELAYS_MS = [2_000, 4_000, 8_000, 16_000, 30_000];
-
-// ─── Watcher state ──────────────────────────────────────────────────────
-
-interface WatcherEntry {
-	child: ChildProcess;
-	cwd: string;
-	restartCount: number;
-	timer?: ReturnType<typeof setTimeout>;
-	notify: (msg: string, level: "info" | "warning" | "error") => void;
-}
-
-let currentWatcher: WatcherEntry | null = null;
-let ensureCwdIndexPromise: Promise<{ ok: boolean; error?: string }> | null = null;
-let shuttingDown = false;
 
 // ─── Shell helpers ──────────────────────────────────────────────────────
 
@@ -119,145 +100,6 @@ function preflightVeraAvailable(
 	});
 }
 
-// ─── Watcher management ─────────────────────────────────────────────────
-
-function stopWatcher(enterShutdown = true): void {
-	shuttingDown = enterShutdown;
-	const w = currentWatcher;
-	currentWatcher = null;
-	if (!w) return;
-	if (w.timer) clearTimeout(w.timer);
-	if (!w.child.killed) {
-		w.child.kill("SIGTERM");
-	}
-}
-
-/**
- * Start a `vera watch .` process for the given target directory.
- * Only meaningful for ctx.cwd (the active workspace).
- */
-function spawnWatcher(
-	targetDir: string,
-	notify: (msg: string, level: "info" | "warning" | "error") => void,
-	restartCount = 0,
-): void {
-	if (shuttingDown) return;
-	// Don't start if already watching this directory with a live process
-	if (currentWatcher && currentWatcher.cwd === targetDir && !currentWatcher.child.killed) {
-		return;
-	}
-
-	stopWatcher(false);
-
-	const bashCmd = veraCommand(targetDir, ["watch", "."]);
-	const child = spawn("bash", ["-c", bashCmd], {
-		stdio: ["ignore", "pipe", "pipe"],
-	});
-
-	let stderrAcc = "";
-
-	child.stderr?.on("data", (d: Buffer) => {
-		stderrAcc += d.toString();
-	});
-
-	const entry: WatcherEntry = {
-		child,
-		cwd: targetDir,
-		restartCount: restartCount,
-		notify,
-	};
-
-	currentWatcher = entry;
-
-	child.on("exit", (code, _signal) => {
-		// If the watcher was replaced or stopped, don't restart
-		if (currentWatcher?.child !== child) return;
-
-		const w = currentWatcher;
-		const tail = stderrAcc.slice(-600);
-
-		// Clean exit (code 0) or signal termination (null) — no restart
-		if (code === 0 || code === null) {
-			currentWatcher = null;
-			return;
-		}
-
-		// Only restart on actual failures (non-zero exit)
-		if (w.restartCount < MAX_RESTARTS) {
-			const nextRestartCount = w.restartCount + 1;
-			const delay = RESTART_DELAYS_MS[w.restartCount] ?? RESTART_DELAYS_MS[RESTART_DELAYS_MS.length - 1];
-			w.restartCount = nextRestartCount;
-			w.notify(
-				`⚠ Vera watch exited (code ${code}). Restart ${nextRestartCount}/${MAX_RESTARTS} in ${delay / 1000}s.`,
-				"warning",
-			);
-			if (tail) {
-				w.notify(`Vera watch stderr: ${tail}`, "warning");
-			}
-			w.timer = setTimeout(() => {
-				spawnWatcher(targetDir, notify, nextRestartCount);
-			}, delay);
-		} else {
-			if (tail) {
-				w.notify(`Vera watch stderr: ${tail}`, "error");
-			}
-			w.notify(
-				"Vera watch failed after retries. Run `vera watch .` manually to re-enable live indexing.",
-				"error",
-			);
-			currentWatcher = null;
-		}
-	});
-}
-
-function startWatcherForCwd(cwd: string, ctx: ExtensionContext): void {
-	shuttingDown = false;
-	if (!existsSync(resolve(cwd, ".vera"))) return;
-	const notify = ctx.hasUI ? ctx.ui.notify.bind(ctx.ui) : () => {};
-	spawnWatcher(cwd, notify);
-}
-
-async function ensureCurrentWorkspaceIndexed(
-	ctx: ExtensionContext,
-	signal?: AbortSignal,
-): Promise<{ ok: boolean; created: boolean; error?: string }> {
-	if (existsSync(resolve(ctx.cwd, ".vera"))) {
-		return { ok: true, created: false };
-	}
-
-	const startedIndexing = !ensureCwdIndexPromise;
-	if (startedIndexing) {
-		if (ctx.hasUI) {
-			ctx.ui.notify("🔍 No Vera index found in current workspace. Generating one-time index...", "info");
-		}
-		ensureCwdIndexPromise = runVera(ctx.cwd, ["index", "."], signal, 300_000)
-			.then((idxResult) => {
-				if (idxResult.code !== 0) {
-					return {
-						ok: false,
-						error: idxResult.stderr || `vera index exited with code ${idxResult.code}`,
-					};
-				}
-				return { ok: true };
-			})
-			.catch((error: unknown) => ({
-				ok: false,
-				error: error instanceof Error ? error.message : String(error),
-			}))
-			.finally(() => {
-				ensureCwdIndexPromise = null;
-			});
-	}
-
-	const promise = ensureCwdIndexPromise;
-	if (!promise) {
-		return { ok: false, created: false, error: "Vera index initialization was not started." };
-	}
-
-	const result = await promise;
-	return { ok: result.ok, created: startedIndexing && result.ok, error: result.error };
-}
-
 // ─── Tool parameter schema ──────────────────────────────────────────────
 
 const SemanticSearchParams = Type.Object({
@@ -324,16 +166,10 @@ const SemanticSearchParams = Type.Object({
 // ─── Extension entry ────────────────────────────────────────────────────
 
 export default function semanticSearchExtension(pi: ExtensionAPI): void {
-	// ── Lifecycle: start watcher on session start (if .vera exists) ─────
+	// ── Lifecycle: verify Vera availability only; never index/watch automatically.
 	pi.on("session_start", (_event, ctx) => {
 		const notify = ctx.hasUI ? ctx.ui.notify.bind(ctx.ui) : () => {};
 		preflightVeraAvailable(notify);
-		startWatcherForCwd(ctx.cwd, ctx);
-	});
-
-	// ── Lifecycle: clean up watcher on shutdown ─────────────────────────
-	pi.on("session_shutdown", () => {
-		stopWatcher();
 	});
 
 	// ── Tool registration ───────────────────────────────────────────────
@@ -382,39 +218,20 @@ export default function semanticSearchExtension(pi: ExtensionAPI): void {
 				};
 			}
 
-			// ── Auto-index for current workspace only ──────────────────
+			// ── Require explicit/manual index for every target ──────────
 			if (!existsSync(resolve(targetDir, ".vera"))) {
-				if (targetDir === cwd) {
-					const indexResult = await ensureCurrentWorkspaceIndexed(ctx, signal);
-					if (!indexResult.ok) {
-						return {
-							content: [{ type: "text" as const, text: `Failed to create Vera index: ${indexResult.error}` }],
-							isError: true,
-							details: {},
-						};
-					}
-					if (indexResult.created && ctx.hasUI) {
-						ctx.ui.notify(
-							"✅ Vera index generated. Tune .veraignore and re-run `vera index .` to adjust what's indexed.",
-							"info",
-						);
-					}
-					// Start watcher after successful index
-					startWatcherForCwd(cwd, ctx);
-				} else {
-					return {
-						content: [
-							{
-								type: "text" as const,
-								text:
-									`No Vera index found at ${targetDir}/.vera. `
-									+ `Run \`vera index ${targetDir}\` first, or choose a different target directory.`,
-							},
-						],
-						isError: true,
-						details: {},
-					};
-				}
+				return {
+					content: [
+						{
+							type: "text" as const,
+							text:
+								`No Vera index found at ${targetDir}/.vera. `
+								+ `Run \`cd ${targetDir} && vera index .\` manually first, then retry semantic-search.`,
+						},
+					],
+					isError: true,
+					details: {},
+				};
 			}
 
 			// ── Build search args ───────────────────────────────────────

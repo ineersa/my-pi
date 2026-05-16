@@ -20,7 +20,7 @@ Local dev: `pi install ./packages/extensions -l`
 - **[skill-palette](extensions/skill-palette/README.md)** — `/skill` command palette to queue a skill for the next prompt with fuzzy search + status widget.
 - **[rewind](extensions/rewind/README.md)** — automatic git worktree snapshots at every prompt boundary with exact file restoration during `/fork` and `/tree` navigation.
 - **session-status** — footer status indicator + `/my-pi` command to verify bundle is loaded.
-- **semantic-search** — semantic/conceptual search over Vera-indexed codebases with auto-indexing and live watcher.
+- **semantic-search** — semantic/conceptual search over manually Vera-indexed codebases (no automatic index/watch).
 **[pi-subagents](../subagents/README.md)** — full-featured subagent extension: single/chain/parallel execution, clarify TUI, model fallback, async, worktrees. Builtin agents removed; uses agents from `~/.agents/` and `.pi/agents/`.
 
 ## Companion packages

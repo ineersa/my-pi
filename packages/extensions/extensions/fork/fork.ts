@@ -26,7 +26,7 @@ import { runFork } from "./runner.js";
 import { getResultSummaryText } from "./runner-events.js";
 import { makeForkResult, parseSessionResult } from "./session-result.js";
 import {
-  countRunningForks,
+  MAX_CONCURRENT_FORKS,
   createRun,
   completeRun,
   failRun,
@@ -557,18 +557,30 @@ export default function (pi: ExtensionAPI) {
       "Use background:true to launch without waiting — you will receive a follow-up when it completes. " +
       "Forks return dense, concrete output: the snippets, signatures, and relationships you'd otherwise have to discover yourself, plus anything they found beyond the task that's worth knowing. " +
       "Use for anything that would generate context noise: exploration, implementation, testing, iteration. " +
-      "IMPORTANT: Only 1 fork can run at a time per working directory. Never launch more than one fork concurrently from the same cwd. If you need multiple forks for one project, wait for the current fork in that cwd to finish before launching the next one.",
+      "IMPORTANT: Up to 3 forks can run concurrently per working directory. The main Pi stays in the top-left. First fork: right half. Second fork: split right pane (top-right + bottom-right). Third fork: split left pane (2x2 grid). Never launch more than 3 concurrent forks from the same cwd.",
     parameters: ForkParams as any,
     renderCall: renderForkCall,
     renderResult: renderForkResult,
 
     async execute(_toolCallId, params: ForkToolParams, signal, onUpdate, ctx) {
       // ── Concurrency check ──────────────────────────────────────
-      const running = countRunningForks(ctx.cwd);
-      if (running >= 1) {
+      // Enforce concurrency per cwd, but base tmux layout only on forks
+      // launched by this parent session so unrelated same-cwd Pi windows
+      // do not get split accidentally.
+      const parentSessionFile = ctx.sessionManager.getSessionFile();
+      const runningForks = listRuns(10, ctx.cwd).filter((run) => run.state === "running");
+      const layoutForks = parentSessionFile
+        ? runningForks.filter((run) => run.parentSessionFile === parentSessionFile)
+        : runningForks;
+      const existingForkPaneIds = layoutForks
+        .map((run) => run.tmuxPaneId)
+        .filter((id): id is string => id !== undefined);
+
+      const running = runningForks.length;
+      if (running >= MAX_CONCURRENT_FORKS) {
         const result = emptyFailedResult(
           params.task,
-          "Another fork is already running for this working directory. Only 1 concurrent fork is allowed per cwd. Wait for the current fork in this project to finish and try again.",
+          `Too many forks running for this working directory. Up to ${MAX_CONCURRENT_FORKS} concurrent forks allowed per cwd. Wait for one to finish before launching another.`,
         );
         return {
           content: [{ type: "text" as const, text: getResultSummaryText(result) }],
@@ -609,7 +621,7 @@ export default function (pi: ExtensionAPI) {
         params.task,
         resolvedModel,
         resolvedThinking,
-        ctx.sessionManager.getSessionFile(),
+        parentSessionFile,
       );
       const runId = runStatus.runId;
 
@@ -623,6 +635,8 @@ export default function (pi: ExtensionAPI) {
         thinking: resolvedThinking,
         signal,
         runId,
+        existingForkPaneIds,
+        existingForkCount: layoutForks.length,
       };
 
       // ── Helper: handle fork completion ─────────────────────────

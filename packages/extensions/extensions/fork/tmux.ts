@@ -59,11 +59,20 @@ function parsePaneDescriptor(value: string): TmuxPaneTarget {
 }
 
 /**
- * Create a right-side sidecar pane for the fork.
- * Splits the current pane horizontally and returns the new pane target.
- * Restores main-vertical layout so the original pane stays full height.
+ * Create a fork pane in a 2x2 grid layout.
+ *
+ * Layout rules (all 50/50 even splits):
+ *   0 existing running forks → split current/main pane vertically (left-right).
+ *   1 existing running fork  → split that existing fork pane horizontally (top-bottom).
+ *   2 existing running forks → split current/main pane horizontally (top-bottom).
+ *
+ * The main Pi always stays in the top-left corner.
+ * If a referenced existing pane no longer exists, falls back to splitting current.
  */
-export function createForkPane(): TmuxPaneTarget {
+export function createForkPane(
+  existingForkPaneIds?: string[],
+  existingForkCount?: number,
+): TmuxPaneTarget {
   const format = "#{pane_id}|#{window_id}|#{session_name}";
   const preferredPane = process.env.TMUX_PANE?.trim();
   const current = parsePaneDescriptor(
@@ -72,22 +81,46 @@ export function createForkPane(): TmuxPaneTarget {
       : tmuxOrThrow(["display-message", "-p", format]),
   );
 
+  const count = existingForkCount ?? existingForkPaneIds?.length ?? 0;
+  let targetPaneId: string;
+  let splitDir: string;
+
+  if (count === 0) {
+    // First fork: split current pane vertically (left/right, 50/50)
+    targetPaneId = current.paneId;
+    splitDir = "-h";
+  } else if (count === 1) {
+    // Second fork: split the existing right-side fork pane horizontally
+    const rightPaneId = existingForkPaneIds?.[0];
+    if (rightPaneId && paneExists(rightPaneId)) {
+      targetPaneId = rightPaneId;
+    } else {
+      targetPaneId = current.paneId;
+    }
+    splitDir = "-v";
+  } else {
+    // Third fork: split the main/current pane horizontally (top/bottom)
+    targetPaneId = current.paneId;
+    splitDir = "-v";
+  }
+
   const forkPane = parsePaneDescriptor(
     tmuxOrThrow([
       "split-window",
       "-d",
-      "-h",
-      "-t",
-      current.paneId,
       "-P",
       "-F",
       format,
+      "-l",
+      "50%",
+      splitDir,
+      "-t",
+      targetPaneId,
       "bash",
     ]),
   );
 
   if (current.windowId) {
-    tmux(["select-layout", "-t", current.windowId, "main-vertical"]);
     tmux(["select-pane", "-t", current.paneId]);
   }
 
