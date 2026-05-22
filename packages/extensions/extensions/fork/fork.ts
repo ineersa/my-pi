@@ -75,6 +75,12 @@ const ForkParams = Type.Object({
         "Run the fork in background mode. The tool returns immediately. A follow-up will be delivered automatically when the fork finishes. Do not wait for the fork; continue with other work.",
     }),
   ),
+  cwd: Type.Optional(
+    Type.String({
+      description:
+        "Working directory for the fork child. Defaults to the current session's cwd. Use when running in a git worktree or when the fork should operate in a different directory.",
+    }),
+  ),
 });
 
 interface ForkToolParams {
@@ -82,6 +88,7 @@ interface ForkToolParams {
   model?: string;
   thinking?: string;
   background?: boolean;
+  cwd?: string;
 }
 
 const FORK_CHILD_SYSTEM_PROMPT = `FORK MODE IS ENABLED.
@@ -408,6 +415,14 @@ export default function (pi: ExtensionAPI) {
     return;
   }
 
+  // ── Disable guard ──────────────────────────────────────────────
+  // When running inside a subagent child, PI_FORK_DISABLE=1 is set to
+  // prevent subagents from spawning their own forks (which would create
+  // unbounded nesting: subagent → fork → fork → ...).
+  if (process.env.PI_FORK_DISABLE === "1") {
+    return;
+  }
+
   // ── Parent-only hooks ──────────────────────────────────────────
 
   pi.on("session_start", async (_event, ctx) => {
@@ -556,6 +571,7 @@ export default function (pi: ExtensionAPI) {
       "Forks run in a tmux pane on the right side so you can watch their progress. " +
       "Use background:true to launch without waiting — you will receive a follow-up when it completes. " +
       "Forks return dense, concrete output: the snippets, signatures, and relationships you'd otherwise have to discover yourself, plus anything they found beyond the task that's worth knowing. " +
+      "Use cwd to run the fork in a different working directory, e.g. when operating in a git worktree. " +
       "Use for anything that would generate context noise: exploration, implementation, testing, iteration. " +
       "IMPORTANT: Up to 3 forks can run concurrently per working directory. The main Pi stays in the top-left. First fork: right half. Second fork: split right pane (top-right + bottom-right). Third fork: split left pane (2x2 grid). Never launch more than 3 concurrent forks from the same cwd.",
     parameters: ForkParams as any,
@@ -615,9 +631,25 @@ export default function (pi: ExtensionAPI) {
 
       const isBackground = params.background === true;
 
+      // ── Resolve fork cwd ───────────────────────────────────────
+      const forkCwd = params.cwd?.trim()
+        ? path.resolve(ctx.cwd, params.cwd.trim())
+        : ctx.cwd;
+      if (params.cwd?.trim() && !fs.existsSync(forkCwd)) {
+        const result = emptyFailedResult(
+          params.task,
+          `Fork cwd '${params.cwd.trim()}' (resolved to '${forkCwd}') does not exist. Provide a valid directory path.`,
+        );
+        return {
+          content: [{ type: "text" as const, text: getResultSummaryText(result) }],
+          details: makeDetails([result]),
+          isError: true,
+        };
+      }
+
       // ── Register run ───────────────────────────────────────────
       const runStatus = createRun(
-        ctx.cwd,
+        forkCwd,
         params.task,
         resolvedModel,
         resolvedThinking,
@@ -628,7 +660,7 @@ export default function (pi: ExtensionAPI) {
       // ── Shared fork launch ─────────────────────────────────────
       // Build common options used by both wait and background modes
       const forkOptions = {
-        cwd: ctx.cwd,
+        cwd: forkCwd,
         task: params.task,
         forkSessionSnapshotJsonl: snapshot,
         model: resolvedModel,

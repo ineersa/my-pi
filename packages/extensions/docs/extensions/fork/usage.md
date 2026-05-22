@@ -28,5 +28,14 @@ Behavior:
   - A follow-up message (`[FORK_DONE]`) is sent automatically when the fork finishes or fails.
 - The parent session context window is not polluted by child activity (no streaming events, no intermediate tool calls).
 - If tmux is unavailable, the fork tool returns an error immediately.
+- The fork extension requires `TMUX_PANE` to be set and verified:
+  - `TMUX_PANE` must point to the tmux pane that actually contains this Pi process.
+  - The extension reads `/proc/<pid>/stat` to verify the current process is a descendant
+    of the pane's root PID (`#{pane_pid}` from tmux).
+  - If `TMUX_PANE` is unset, points to a non-existent pane, or points to a pane that does
+    not contain this Pi instance, the fork tool returns a clear error (it does not fall
+    back to tmux's implicit pane/client, which could split a different terminal).
+  - This prevents forks from accidentally splitting another Pi terminal when multiple
+    Pi instances run in different tmux panes.
 - Aborting the tool call (Ctrl-C / signal) sends Ctrl-C to the child tmux pane.
 - On parent session shutdown, all running forks are cleaned up: tmux panes are killed, PID-based SIGTERM is sent as fallback, and runs are marked as failed.

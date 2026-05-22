@@ -21,7 +21,7 @@ Notes:
 | `types.ts` | Shared type definitions: `ForkResult`, `ForkToolExecution`, `ForkThinkingState`, `ForkActivity`, `ForkRetryState`, `UsageStats`, `ForkDetails`. Also normalization helpers: `normalizeCompletedResult`, `isResultSuccess`, `isResultError` |
 | `status-store.ts` | Persistent run status store under `~/.pi/agent/extensions/fork/runs/<runId>/`. Enforces `MAX_CONCURRENT_FORKS = 3` per working directory (`cwd`), stale-run reaping (30-min threshold), `createRun`/`updateRun`/`completeRun`/`failRun`/`countRunningForks`/`listRuns` |
 | `env.ts` | `buildChildEnv` — builds child process environment from configured overrides, always forces `PI_OFFLINE=1` and `PI_FORK=1` |
-| `tmux.ts` | Tmux pane management: `createForkPane` (2x2 grid, 50/50 split layout), `killPane`, `paneExists`, `sendCtrlCToPane`, `startPaneLogPipe`, `stopPaneLogPipe`, `getPanePid` |
+| `tmux.ts` | Tmux pane management: `createForkPane` (2x2 grid, 50/50 split layout), `killPane`, `paneExists`, `sendCtrlCToPane`, `startPaneLogPipe`, `stopPaneLogPipe`, `getPanePid`, `resolveMainPaneId` (TMUX_PANE + /proc ancestry verification), `isAncestorPid`, `getParentPid` |
 | `plans/` | Design documents for the tmux-interactive fork rewrite |
 
 ## Environment variables forced on fork children

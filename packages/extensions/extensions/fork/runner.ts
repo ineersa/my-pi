@@ -352,6 +352,9 @@ function buildTmuxScript(input: {
   // Force observational memory into passive mode inside forks.
   lines.push("export PI_OBSERVATIONAL_MEMORY_PASSIVE=1");
 
+  // Pass cwd to the login-shell child via env var so it can cd after profile sourcing.
+  lines.push(`export PI_FORK_CWD=${shellQuote(cwd)}`);
+
   // Build the pi command: pi --session <sessionPath> [flags] <task>
   const cmdParts = [
     shellQuote(command),
@@ -360,7 +363,7 @@ function buildTmuxScript(input: {
     shellQuote(sessionPath),
     ...launchArgs.map(shellQuote),
   ];
-  const launchCommand = `printf '%s\\n' "$$" > ${shellQuote(pidPath)}; exec ${cmdParts.join(" ")}`;
+  const launchCommand = `cd "$PI_FORK_CWD" || exit 1; printf '%s\\n' "$$" > ${shellQuote(pidPath)}; exec ${cmdParts.join(" ")}`;
   lines.push(`bash -lc ${shellQuote(launchCommand)}`);
 
   // Print exit marker for parent polling

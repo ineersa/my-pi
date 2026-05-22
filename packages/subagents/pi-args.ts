@@ -187,6 +187,7 @@ export function buildPiArgs(input: BuildPiArgsInput): BuildPiArgsResult {
 		env.PI_OFFLINE = "1";
 		env.PI_SUBAGENT_DISABLE_SCHEDULER = "1";
 		env.PI_OBSERVATIONAL_MEMORY_PASSIVE = "1";
+		env.PI_FORK_DISABLE = "1";
 	}
 
 	return { args, env, tempDir };

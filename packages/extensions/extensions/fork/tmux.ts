@@ -6,6 +6,7 @@
  * sidecar panes on the right side of the terminal.
  */
 
+import * as fs from "node:fs";
 import { spawnSync } from "node:child_process";
 
 export interface TmuxPaneTarget {
@@ -45,6 +46,93 @@ export function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'"'"'`)}'`;
 }
 
+/**
+ * Read the parent PID of a Linux process from /proc/<pid>/stat.
+ * Returns undefined if the process does not exist or /proc is unavailable.
+ *
+ * Exported for testing; prefer isAncestorPid() for consumption.
+ */
+export function getParentPid(pid: number): number | undefined {
+  try {
+    const stat = fs.readFileSync(`/proc/${pid}/stat`, "utf8");
+    // Format: pid (comm) state ppid ...
+    // comm (field 1) is enclosed in parentheses and is the only field that
+    // can contain whitespace, so we find its closing paren.
+    const endParen = stat.lastIndexOf(")");
+    if (endParen === -1) return undefined;
+    // After the closing paren: space then state, space then ppid
+    const rest = stat.slice(endParen + 2);
+    const fields = rest.split(" ");
+    return Number(fields[1]);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Walk the process ancestry chain from `pid` up to determine whether
+ * `ancestorPid` is an ancestor (or equals `pid` itself).
+ *
+ * Uses getParentPid() which reads /proc/<pid>/stat on Linux.
+ * Returns true if ancestorPid is anywhere in the chain up to depth 100.
+ */
+export function isAncestorPid(ancestorPid: number, pid: number): boolean {
+  let current = pid;
+  for (let i = 0; i < 100; i++) {
+    if (current === ancestorPid) return true;
+    if (current <= 1) return false;
+    const parent = getParentPid(current);
+    // If we can't read the parent, stop (process may have exited)
+    if (parent === undefined || parent === current) return false;
+    current = parent;
+  }
+  return false;
+}
+
+/**
+ * Resolve the main Pi pane ID with TMUX_PANE verification.
+ *
+ * - Requires `TMUX_PANE` to be set (no unsafe fallback).
+ * - Verifies the pane exists via tmux.
+ * - Verifies the current process (`process.pid`) is a descendant of the
+ *   pane's root process (`#{pane_pid}`) using /proc ancestry.
+ * - Throws a descriptive error if any check fails.
+ *
+ * This prevents the fork extension from accidentally splitting a different
+ * tmux pane/terminal when multiple Pi instances are running.
+ */
+export function resolveMainPaneId(): string {
+  const tmuxPane = process.env.TMUX_PANE?.trim();
+  if (!tmuxPane) {
+    throw new Error(
+      "Fork requires running inside a tmux pane with TMUX_PANE set.\n" +
+      "The TMUX_PANE environment variable is not set or is empty.\n" +
+      "Make sure Pi is running directly inside a tmux pane, or set " +
+      "TMUX_PANE to the pane ID that contains this Pi session.",
+    );
+  }
+
+  const panePid = getPanePid(tmuxPane);
+  if (panePid === undefined) {
+    throw new Error(
+      `TMUX_PANE=${tmuxPane} — tmux pane does not exist or its PID is unavailable. ` +
+      "Cannot determine the current tmux pane to split.",
+    );
+  }
+
+  if (!isAncestorPid(panePid, process.pid)) {
+    throw new Error(
+      `TMUX_PANE=${tmuxPane} (pane PID ${panePid}) is not associated with the ` +
+      `current Pi process (PID ${process.pid}).\n` +
+      "The TMUX_PANE environment variable appears to point to a different terminal pane.\n" +
+      "To fix this, run Pi directly inside a tmux pane (so tmux sets TMUX_PANE automatically), " +
+      "or explicitly set TMUX_PANE to the pane ID that contains this Pi session.",
+    );
+  }
+
+  return tmuxPane;
+}
+
 function parsePaneDescriptor(value: string): TmuxPaneTarget {
   const [paneIdRaw, windowIdRaw, sessionNameRaw] = value.split("|");
   const paneId = (paneIdRaw ?? "").trim();
@@ -74,11 +162,9 @@ export function createForkPane(
   existingForkCount?: number,
 ): TmuxPaneTarget {
   const format = "#{pane_id}|#{window_id}|#{session_name}";
-  const preferredPane = process.env.TMUX_PANE?.trim();
+  const mainPaneId = resolveMainPaneId();
   const current = parsePaneDescriptor(
-    preferredPane
-      ? tmuxOrThrow(["display-message", "-p", "-t", preferredPane, format])
-      : tmuxOrThrow(["display-message", "-p", format]),
+    tmuxOrThrow(["display-message", "-p", "-t", mainPaneId, format]),
   );
 
   const count = existingForkCount ?? existingForkPaneIds?.length ?? 0;
