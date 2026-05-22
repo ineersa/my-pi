@@ -7,10 +7,11 @@ Entry: `extensions/prompt-channels/prompt-channels.ts`
 The extension moves bulky prompt resources out of the system prompt while keeping
 small meta-hints in the system prompt about where those resources now appear.
 
-It hooks three lifecycle events:
+It hooks four lifecycle events:
 
 | Event | Purpose |
 | --- | --- |
+| `session_start` | Detect resume/fork and skip initial injection if conversation already has a prompt-channels message |
 | `before_agent_start` | Strip project-context and skills from the system prompt, add tiny channel hints, and inject user-level custom context |
 | `context` | Reorder outbound LLM messages so `prompt-channels` appears before the corresponding user prompt |
 | `session_compact` | Mark the channels for reinjection on the next turn |
@@ -95,6 +96,7 @@ When that happens, prefer upgrading to a pi build that exposes `systemPromptOpti
 | Trigger | Behavior |
 | --- | --- |
 | First turn | Inject |
+| `session_start` with reason `resume`/`fork` | Skip injection; save hashes for future change detection |
 | `session_compact` | Inject on next turn |
 | Context hash changed | Inject |
 | Skills hash changed | Inject |
@@ -111,6 +113,7 @@ The extension keeps per-session in-memory state:
 | `lastSkillsHash` | Detect skills-registry changes |
 | `lastCwd` | Rebuild the header when session cwd changes |
 | `pendingReinject` | Force reinjection after compaction |
+| `skipInitialInject` | Prevent duplicate injection on resume/fork |
 
 ## Subagent / fork inheritance
 

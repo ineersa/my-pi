@@ -51,6 +51,10 @@ interface ChannelsState {
 	lastSkillsHash: string | undefined;
 	lastCwd: string | undefined;
 	pendingReinject: boolean;
+	/** When true, the conversation already has a prompt-channels message from a
+	 *  prior session (resume/fork). The first before_agent_start should save
+	 *  hashes but skip injection. */
+	skipInitialInject: boolean;
 }
 
 interface MessageLike {
@@ -64,6 +68,7 @@ function createState(): ChannelsState {
 		lastSkillsHash: undefined,
 		lastCwd: undefined,
 		pendingReinject: true,
+		skipInitialInject: false,
 	};
 }
 
@@ -258,6 +263,15 @@ function resolveSkillsContent(systemPrompt: string, event: unknown): string | nu
 export default function promptChannels(pi: ExtensionAPI): void {
 	const state = createState();
 
+	const RESUME_REASONS = new Set(["resume", "fork"]);
+
+	pi.on("session_start", (event) => {
+		if (RESUME_REASONS.has(event.reason)) {
+			state.pendingReinject = false;
+			state.skipInitialInject = true;
+		}
+	});
+
 	pi.on("session_compact", () => {
 		state.pendingReinject = true;
 	});
@@ -286,6 +300,13 @@ export default function promptChannels(pi: ExtensionAPI): void {
 		state.lastContextHash = contextHash;
 		state.lastSkillsHash = skillsHash;
 		state.lastCwd = ctx.cwd;
+
+		// On resume/fork the conversation already contains our custom message.
+		// Save hashes so future changes are detected, but skip injection.
+		if (state.skipInitialInject) {
+			state.skipInitialInject = false;
+			return modifiedPrompt === systemPrompt ? undefined : { systemPrompt: modifiedPrompt };
+		}
 
 		if (!shouldReinject) {
 			state.pendingReinject = false;
