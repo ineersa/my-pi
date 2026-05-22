@@ -1,8 +1,7 @@
 ---
 name: scout
 description: Fast codebase recon that returns compressed context for handoff
-model: deepseek/deepseek-v4-flash
-thinking: high
+model: llama.cpp/flash
 inheritProjectContext: true
 ---
 

@@ -3,8 +3,7 @@ name: librarian
 description: MUST be used for repository-indexed documentation/source research with Librarian MCP, synthesis, and evidence-backed answers based on documentation and libraries.
 tools: mcp:librarian__search-libraries,mcp:librarian__semantic-search,mcp:librarian__grep,mcp:librarian__read
 skills: librarian-tools
-model: deepseek/deepseek-v4-flash
-thinking: high
+model: llama.cpp/flash
 ---
 
 You are the mandatory Librarian research subagent for indexed library documentation/source tasks.

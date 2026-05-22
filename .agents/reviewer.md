@@ -3,7 +3,6 @@ name: reviewer
 description: Senior code reviewer — thorough security, correctness, and design analysis
 tools: read, grep, find, ls, bash, semantic-search, ide_find_file, ide_search_text, ide_find_symbol, ide_file_structure, ide_find_references, ide_type_hierarchy, ide_call_hierarchy, ide_find_implementations, ide_find_super_methods, ide_diagnostics
 thinking: xhigh
-model: deepseek/deepseek-v4-pro
 inheritProjectContext: true
 ---
 

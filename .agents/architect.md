@@ -1,9 +1,7 @@
 ---
 name: architect
 description: Read-only codebase architecture reviewer — loads improve-codebase-architecture skill, analyzes requested code, and delivers a structured report with deepening opportunities and refactoring candidates.
-model: deepseek/deepseek-v4-pro
 thinking: xhigh
-systemPromptMode: replace
 inheritProjectContext: true
 skill: improve-codebase-architecture
 ---
