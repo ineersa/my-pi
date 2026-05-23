@@ -13,8 +13,8 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { type ExtensionAPI, type ExtensionContext, type ToolDefinition } from "@mariozechner/pi-coding-agent";
-import { Text } from "@mariozechner/pi-tui";
+import { type ExtensionAPI, type ExtensionContext, type ToolDefinition } from "@earendil-works/pi-coding-agent";
+import { Text } from "@earendil-works/pi-tui";
 import { discoverAgents } from "./agents.ts";
 import { cleanupAllArtifactDirs, cleanupOldArtifacts, getArtifactsDir } from "./artifacts.ts";
 import { renderSubagentResult } from "./render.ts";
@@ -110,7 +110,7 @@ function writeSubagentChildResult(messages: unknown[]): void {
 	const result: SubagentChildResult = {
 		task: process.env.PI_SUBAGENT_TASK ?? "",
 		exitCode: 0,
-		messages: safeMessages as import("@mariozechner/pi-ai").Message[],
+		messages: safeMessages as import("@earendil-works/pi-ai").Message[],
 		usage: collectChildUsage(safeMessages),
 		model: metadata.model,
 		provider: metadata.provider,

@@ -2,7 +2,7 @@
  * ide_diagnostics — file-only IDE diagnostics wrapper.
  */
 import { Type } from "@sinclair/typebox";
-import { StringEnum } from "@mariozechner/pi-ai";
+import { StringEnum } from "@earendil-works/pi-ai";
 import { JetBrainsService } from "../jetbrains-service.js";
 import { prepareFileForDiagnostics } from "../diagnostics-protocol.js";
 import { toToon, makeError } from "../response-formatting.js";

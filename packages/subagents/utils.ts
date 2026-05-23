@@ -5,7 +5,7 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { Message, TextContent } from "@mariozechner/pi-ai";
+import type { Message, TextContent } from "@earendil-works/pi-ai";
 import { formatToolCall } from "./formatters.ts";
 import type { AgentProgress, Details, DisplayItem, ErrorInfo, SingleResult, ToolCallSummary } from "./types.ts";
 

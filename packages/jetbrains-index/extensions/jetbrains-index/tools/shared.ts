@@ -2,7 +2,7 @@
  * Shared helpers and constants for first-class Pi wrapper tools.
  */
 import { Type } from "@sinclair/typebox";
-import { StringEnum } from "@mariozechner/pi-ai";
+import { StringEnum } from "@earendil-works/pi-ai";
 import { JetBrainsService, type JetBrainsToolKey, type MCPToolDefinition } from "../jetbrains-service.js";
 import { resolveTarget, type TargetInput } from "../target-resolver.js";
 import { toToon, makeError, isMcpError, getMcpErrorText, decodeMcpPayload } from "../response-formatting.js";

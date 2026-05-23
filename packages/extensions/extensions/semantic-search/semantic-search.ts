@@ -11,9 +11,9 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { resolve, isAbsolute } from "node:path";
-import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
-import { StringEnum } from "@mariozechner/pi-ai";
+import { StringEnum } from "@earendil-works/pi-ai";
 
 // ─── Shell helpers ──────────────────────────────────────────────────────
 

@@ -72,7 +72,7 @@ The following skills provide specialized instructions for specific tasks.
 The extension supports two runtime modes:
 
 1. **Preferred**: if `event.systemPromptOptions` exists, use its `contextFiles` and `skills`
-2. **Fallback**: if running on older pi builds (such as `@mariozechner/pi-coding-agent@0.67.1`), parse the assembled system prompt string directly
+2. **Fallback**: if running on older pi builds (such as `@earendil-works/pi-coding-agent@0.67.1`), parse the assembled system prompt string directly
 
 This keeps the extension compatible with current my-pi installs while automatically
 becoming more robust on newer pi versions.

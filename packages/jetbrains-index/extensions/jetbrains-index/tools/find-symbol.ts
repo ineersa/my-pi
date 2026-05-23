@@ -2,7 +2,7 @@
  * ide_find_symbol — merged symbol search (findSymbol with findClass fallback).
  */
 import { Type } from "@sinclair/typebox";
-import { StringEnum } from "@mariozechner/pi-ai";
+import { StringEnum } from "@earendil-works/pi-ai";
 import { JetBrainsService } from "../jetbrains-service.js";
 import { toToon, makeError } from "../response-formatting.js";
 import { getParamDesc, callTool } from "./shared.js";

@@ -1,15 +1,16 @@
 {
   "lastChangelogVersion": "0.72.1",
   "defaultThinkingLevel": "high",
-  "defaultProvider": "openai-codex",
-  "defaultModel": "gpt-5.4",
+  "defaultProvider": "zai",
+  "defaultModel": "glm-5.1",
   "enabledModels": [
     "llama.cpp/flash",
     "zai/glm-5.1",
     "deepseek/deepseek-v4-flash",
     "deepseek/deepseek-v4-pro",
     "openai-codex/gpt-5.4-mini",
-    "openai-codex/gpt-5.4"
+    "openai-codex/gpt-5.5",
+    "runpod/Qwen3.6-27B"
   ],
   "theme": "cyberpunk",
   "packages": [
@@ -17,18 +18,20 @@
     "../../claw/my-pi/packages/themes",
     "../../claw/my-pi/packages/jetbrains-index",
     "../../claw/pi-observational-memory",
-    "../../claw/my-pi/packages/pi-mcp-adapter"
+    "../../claw/my-pi/packages/pi-mcp-adapter",
+    "../../claw/my-pi/packages/subagents"
   ],
   "hideThinkingBlock": false,
   "observational-memory": {
-    "observationThresholdTokens": 5000,
-    "compactionThresholdTokens": 80000,
-    "reflectionThresholdTokens": 30000,
-    "passive": false,
-    "compactionModel": {
-      "provider": "llama.cpp",
-      "id": "flash"
-    }
+    "observeAfterTokens": 5000,
+    "reflectAfterTokens": 30000,
+    "compactAfterTokens": 50000,
+    "observationsPoolMaxTokens": 20000,
+    "model": {
+      "provider": "runpod",
+      "id": "Qwen3.6-27B"
+    },
+    "passive": false
   },
   "jetbrainsIndex": {
     "url": "http://127.0.0.1:29175/index-mcp/streamable-http"

@@ -10,7 +10,7 @@
  * otherwise it falls back to parsing the assembled system prompt string.
  */
 
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 const CUSTOM_TYPE = "prompt-channels";
 

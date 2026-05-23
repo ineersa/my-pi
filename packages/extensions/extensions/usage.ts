@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { OAuthCredentials } from "@mariozechner/pi-ai";
-import { AuthStorage, getAgentDir, type ExtensionAPI, type ExtensionContext } from "@mariozechner/pi-coding-agent";
+import type { OAuthCredentials } from "@earendil-works/pi-ai";
+import { AuthStorage, getAgentDir, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 type PiAuthEntry = {
 	type?: string;
@@ -62,7 +62,7 @@ const ZAI_ENV_KEY = "ZAI_API_KEY";
 const ZAI_MODELS_ENDPOINT = "https://api.z.ai/api/coding/paas/v4/models";
 const ZAI_QUOTA_ENDPOINT = "https://api.z.ai/api/monitor/usage/quota/limit";
 
-let oauthModule: typeof import("@mariozechner/pi-ai/oauth") | null = null;
+let oauthModule: typeof import("@earendil-works/pi-ai/oauth") | null = null;
 let authStorage: AuthStorage | null = null;
 
 function getAuthPath(): string {
@@ -311,12 +311,12 @@ function persistAuthEntry(authKey: string, entry: PiAuthEntry): void {
 	}
 }
 
-async function getOAuthModule(): Promise<typeof import("@mariozechner/pi-ai/oauth") | null> {
+async function getOAuthModule(): Promise<typeof import("@earendil-works/pi-ai/oauth") | null> {
 	if (oauthModule) {
 		return oauthModule;
 	}
 	try {
-		oauthModule = await import("@mariozechner/pi-ai/oauth");
+		oauthModule = await import("@earendil-works/pi-ai/oauth");
 		return oauthModule;
 	} catch {
 		return null;

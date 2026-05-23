@@ -1,4 +1,4 @@
-import type { ExtensionAPI, ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import type { McpExtensionState } from "./state.js";
 import { Type } from "@sinclair/typebox";
 import { showStatus, showTools, reconnectServers } from "./commands.js";

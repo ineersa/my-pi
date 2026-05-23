@@ -2,7 +2,7 @@
  * ide_find_references — resolver-backed wrapper for IDE reference search.
  */
 import { Type } from "@sinclair/typebox";
-import { StringEnum } from "@mariozechner/pi-ai";
+import { StringEnum } from "@earendil-works/pi-ai";
 import { JetBrainsService } from "../jetbrains-service.js";
 import { getParamDesc, callTool, resolveAndMerge, TargetParams } from "./shared.js";
 import type { ToolResult, ToolRegistration } from "./types.js";

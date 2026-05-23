@@ -2,14 +2,15 @@
   "packages": [],
   "theme": "cyberpunk",
   "observational-memory": {
-    "observationThresholdTokens": 5000,
-    "compactionThresholdTokens": 50000,
-    "reflectionThresholdTokens": 30000,
-    "passive": false,
-    "compactionModel": {
-      "provider": "llama.cpp",
-      "id": "flash"
-    }
+    "observeAfterTokens": 5000,
+    "reflectAfterTokens": 30000,
+    "compactAfterTokens": 50000,
+    "observationsPoolMaxTokens": 20000,
+    "model": {
+      "provider": "runpod",
+      "id": "Qwen3.6-27B"
+    },
+    "passive": false
   },
   "hideThinkingBlock": false,
   "compaction": {

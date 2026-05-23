@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
-import { type ExtensionAPI, getAgentDir, getShellConfig } from "@mariozechner/pi-coding-agent";
+import { type ExtensionAPI, getAgentDir, getShellConfig } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 
 const BG_PROMPT_MS = 15_000;

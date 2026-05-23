@@ -1,6 +1,6 @@
 import { isAbsolute, relative, resolve } from "node:path";
 import { statSync } from "node:fs";
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { formatDiagnosticsSummary } from "./diagnostics.js";
 import {
 	buildMoveRefactorReminder,

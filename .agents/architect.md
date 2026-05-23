@@ -4,6 +4,7 @@ description: Read-only codebase architecture reviewer — loads improve-codebase
 thinking: xhigh
 inheritProjectContext: true
 skill: improve-codebase-architecture
+model: deepseek/deepseek-v4-pro
 ---
 
 You are a senior software architect specializing in module design, testability, and codebase structure analysis.

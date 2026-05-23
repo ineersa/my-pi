@@ -2,7 +2,7 @@
  * ide_search_text — thin passthrough wrapper for indexed text search.
  */
 import { Type } from "@sinclair/typebox";
-import { StringEnum } from "@mariozechner/pi-ai";
+import { StringEnum } from "@earendil-works/pi-ai";
 import { JetBrainsService } from "../jetbrains-service.js";
 import { getParamDesc, getToolDesc, callTool } from "./shared.js";
 import type { ToolRegistration } from "./types.js";

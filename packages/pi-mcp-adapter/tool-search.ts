@@ -7,7 +7,7 @@
 //
 // ToolSearch supports two modes: keyword search and exact "select:" prefix.
 
-import type { AgentToolResult, ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { AgentToolResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import type { McpExtensionState } from "./state.js";
 

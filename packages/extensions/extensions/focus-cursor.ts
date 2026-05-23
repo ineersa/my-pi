@@ -1,5 +1,5 @@
-import { CustomEditor, type ExtensionAPI, type KeybindingsManager } from "@mariozechner/pi-coding-agent";
-import type { EditorTheme, TUI } from "@mariozechner/pi-tui";
+import { CustomEditor, type ExtensionAPI, type KeybindingsManager } from "@earendil-works/pi-coding-agent";
+import type { EditorTheme, TUI } from "@earendil-works/pi-tui";
 
 // Remove the software cursor (reverse-video span) only when the editor also emits
 // the hardware cursor marker. This keeps fallback behavior (software cursor)

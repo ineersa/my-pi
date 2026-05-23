@@ -162,7 +162,7 @@ function findPi() {
 		} catch { /* next */ }
 	}
 	console.error("Error: 'pi' command not found. Install pi-coding-agent first:");
-	console.error("  npm install -g @mariozechner/pi-coding-agent");
+	console.error("  npm install -g @earendil-works/pi-coding-agent");
 	process.exit(1);
 }
 
