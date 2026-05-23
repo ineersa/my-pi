@@ -1,6 +1,6 @@
 {
   "name": "@ineersa/my-pi-jetbrains-index",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "JetBrains index diagnostics gate extension for pi-coding-agent",
   "keywords": [
     "pi-package"

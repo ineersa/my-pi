@@ -18,6 +18,12 @@ import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import {
+	DEFAULT_COMPACTION_SETTINGS,
+	findCutPoint,
+	type CompactionEntry,
+	type SessionEntry,
+} from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import { aggregateInclusiveCost, formatForkCostStatus } from "./cost.js";
 import { loadConfig } from "./config.js";
@@ -293,6 +299,201 @@ function appendForkOverrideEntries(
   return entries;
 }
 
+// ── Virtual compaction for fork snapshots ────────────────────────────
+// Inlines observational memory's observation/reflection extraction to avoid
+// a cross-package dependency. Reads well-known custom entries that
+// pi-observational-memory writes into the session tree.
+
+interface OmObservation {
+  id: string;
+  content: string;
+  timestamp: string;
+  relevance: string;
+  sourceEntryIds: string[];
+  tokenCount: number;
+}
+
+interface OmReflection {
+  id: string;
+  content: string;
+  supportingObservationIds: string[];
+  tokenCount: number;
+}
+
+const OM_SUMMARY_HEADER = `These are condensed memories from earlier in this session.
+
+- Reflections: stable, long-lived facts about the user, project, decisions, and constraints.
+- Observations: timestamped events from the conversation history, in chronological order.
+
+Treat these as past records. When entries conflict, the most recent observation reflects the latest known state. Work that prior observations describe as completed should not be redone unless the user explicitly asks to revisit it.`;
+
+function collectOmData(
+  entries: SessionEntry[],
+  upToIndex: number,
+): { observations: OmObservation[]; reflections: OmReflection[] } {
+  const observations: OmObservation[] = [];
+  const reflections: OmReflection[] = [];
+  const seenObservationIds = new Set<string>();
+  const seenReflectionIds = new Set<string>();
+  const droppedIds = new Set<string>();
+
+  for (let i = 0; i < upToIndex; i++) {
+    const entry = entries[i];
+    if (!entry || entry.type !== "custom" || typeof entry.customType !== "string") continue;
+
+    if (entry.customType === "om.observations.recorded") {
+      const data = entry.data as { observations?: OmObservation[] } | undefined;
+      if (!data?.observations) continue;
+      for (const obs of data.observations) {
+        if (!droppedIds.has(obs.id) && !seenObservationIds.has(obs.id)) {
+          seenObservationIds.add(obs.id);
+          observations.push(obs);
+        }
+      }
+    } else if (entry.customType === "om.reflections.recorded") {
+      const data = entry.data as { reflections?: OmReflection[] } | undefined;
+      if (!data?.reflections) continue;
+      for (const ref of data.reflections) {
+        if (!seenReflectionIds.has(ref.id)) {
+          seenReflectionIds.add(ref.id);
+          reflections.push(ref);
+        }
+      }
+    } else if (entry.customType === "om.observations.dropped") {
+      const data = entry.data as { observationIds?: string[] } | undefined;
+      if (!data?.observationIds) continue;
+      for (const id of data.observationIds) droppedIds.add(id);
+    }
+  }
+
+  // Filter out dropped observations
+  return {
+    observations: droppedIds.size > 0
+      ? observations.filter((o) => !droppedIds.has(o.id))
+      : observations,
+    reflections,
+  };
+}
+
+function renderOmSummary(reflections: OmReflection[], observations: OmObservation[]): string {
+  if (reflections.length === 0 && observations.length === 0) return "";
+
+  const parts: string[] = [OM_SUMMARY_HEADER];
+  if (reflections.length > 0) {
+    parts.push(
+      "## Reflections\n" +
+        reflections.map((r) => `[${r.id}] ${r.content}`).join("\n"),
+    );
+  }
+  if (observations.length > 0) {
+    parts.push(
+      "## Observations\n" +
+        observations.map((o) => `[${o.id}] ${o.timestamp} [${o.relevance}] ${o.content}`).join("\n"),
+    );
+  }
+  return parts.join("\n\n");
+}
+
+interface ExistingCompaction {
+  entry: SessionEntry & { type: "compaction" };
+  index: number;
+}
+
+function findExistingCompaction(entries: SessionEntry[]): ExistingCompaction | undefined {
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const entry = entries[i];
+    if (entry && typeof entry === "object" && (entry as { type?: unknown }).type === "compaction") {
+      return { entry: entry as SessionEntry & { type: "compaction" }, index: i };
+    }
+  }
+  return undefined;
+}
+
+function isOmDetailsPopulated(details: unknown): boolean {
+  if (!details || typeof details !== "object") return false;
+  const d = details as { type?: string; observations?: unknown[]; reflections?: unknown[] };
+  if (d.type !== "om.folded") return false;
+  return (d.observations?.length ?? 0) > 0 || (d.reflections?.length ?? 0) > 0;
+}
+
+function injectVirtualCompaction(branchEntries: unknown[]): unknown[] {
+  const entries = branchEntries as SessionEntry[];
+  const existing = findExistingCompaction(entries);
+
+  if (existing && isOmDetailsPopulated(existing.entry.details)) {
+    // Existing compaction has meaningful OM data — nothing to do
+    return branchEntries;
+  }
+
+  if (existing) {
+    // Existing compaction but empty OM details — rebuild with OM data from entire branch
+    // Collect OM data from ALL entries (both before and after the compaction boundary)
+    const { observations, reflections } = collectOmData(entries, entries.length);
+    const summary = renderOmSummary(reflections, observations);
+
+    // No observational memory data at all — leave as-is
+    if (!summary) return branchEntries;
+
+    // Replace the existing compaction's details and summary
+    const patched = [...entries];
+    patched[existing.index] = {
+      ...existing.entry,
+      summary,
+      details: {
+        type: "om.folded",
+        version: 1,
+        fullFold: true,
+        observations,
+        reflections,
+      },
+    };
+    return patched;
+  }
+
+  // No compaction at all — find a cut point and build a virtual one
+  const settings = DEFAULT_COMPACTION_SETTINGS;
+  const cutPoint = findCutPoint(entries, 0, entries.length, settings.keepRecentTokens);
+  if (cutPoint.firstKeptEntryIndex === 0) return branchEntries;
+
+  const firstKeptEntry = entries[cutPoint.firstKeptEntryIndex];
+  if (!firstKeptEntry?.id) return branchEntries;
+
+  // Collect observational memory data from entries that will be discarded
+  const { observations, reflections } = collectOmData(entries, cutPoint.firstKeptEntryIndex);
+  const summary = renderOmSummary(reflections, observations);
+
+  // No observational memory data — compaction won't help
+  if (!summary) return branchEntries;
+
+  // Build the virtual compaction entry
+  const virtualCompaction: CompactionEntry = {
+    type: "compaction",
+    id: makeSyntheticSessionEntryId(),
+    parentId: firstKeptEntry.parentId,
+    timestamp: new Date().toISOString(),
+    summary,
+    firstKeptEntryId: firstKeptEntry.id,
+    tokensBefore: 0,
+    details: {
+      type: "om.folded",
+      version: 1,
+      fullFold: true,
+      observations,
+      reflections,
+    },
+  };
+
+  // Splice: discard everything before the cut, inject compaction, then kept entries
+  const after = entries.slice(cutPoint.firstKeptEntryIndex);
+
+  // Rewrite parentId of firstKeptEntry to point to the virtual compaction
+  const patchedAfter = after.map((entry, idx) =>
+    idx === 0 ? { ...entry, parentId: virtualCompaction.id } : entry,
+  );
+
+  return [virtualCompaction, ...patchedAfter];
+}
+
 function buildForkSessionSnapshotJsonl(
   sessionManager: SessionSnapshotSource,
   model?: string,
@@ -301,8 +502,11 @@ function buildForkSessionSnapshotJsonl(
   const header = sessionManager.getHeader();
   if (!header || typeof header !== "object") return null;
 
-  const branchEntries = appendForkOverrideEntries(
+  const compacted = injectVirtualCompaction(
     sanitizeForkSnapshotBranch(sessionManager.getBranch()),
+  );
+  const branchEntries = appendForkOverrideEntries(
+    compacted,
     model,
     thinking,
   );

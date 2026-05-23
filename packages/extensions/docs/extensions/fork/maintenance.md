@@ -46,6 +46,27 @@ When `runFork` launches a child:
 7. The pane is auto-closed (wait mode) or left for observation (background mode).
 8. If no result artifact is found, a synthetic failure `ForkResult` is constructed.
 
+## Virtual compaction
+
+Before writing the session snapshot, `injectVirtualCompaction` checks whether the
+branch would benefit from compaction and observational memory data is available.
+
+Three cases:
+
+1. **Existing compaction with populated OM details** — skip (already good).
+2. **Existing compaction with empty OM details** — patch in-place: collect OM data from
+   the entire branch and replace the compaction's `summary` and `details` with the
+   populated versions. The existing cut point and `firstKeptEntryId` are preserved.
+3. **No compaction** — find a cut point via `findCutPoint`, collect OM data from entries
+   that will be discarded, build a synthetic `CompactionEntry`, and splice it into the branch.
+
+In all cases the function is purely synchronous with no LLM calls. The fork child sees a
+normal compaction entry and `buildSessionContext()` handles it natively. The main session
+is never modified.
+
+Requires `pi-observational-memory` to be installed (for the custom entries to exist),
+but has no import dependency on it — reads the well-known custom entry types directly.
+
 ## Concurrency
 
 - `MAX_CONCURRENT_FORKS = 3` in `status-store.ts`, enforced per working directory (`cwd`). Up to 3 concurrent forks per cwd.
