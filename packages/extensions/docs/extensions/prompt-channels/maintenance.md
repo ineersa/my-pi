@@ -81,7 +81,9 @@ becoming more robust on newer pi versions.
 
 Fallback parsing uses pi's current prompt assembly format:
 
-- project context anchor:
+- project context anchor (new format, pi >= ~0.68):
+  `<project_context>` ... `</project_context>` with `<project_instructions>` tags
+- project context anchor (old format, pi < ~0.68):
   `# Project Context\n\nProject-specific instructions and guidelines:\n\n`
 - skills anchor:
   the full introductory paragraph beginning with

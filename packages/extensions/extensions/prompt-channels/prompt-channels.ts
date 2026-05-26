@@ -14,7 +14,11 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 const CUSTOM_TYPE = "prompt-channels";
 
-const PROJECT_CONTEXT_ANCHOR = "# Project Context\n\nProject-specific instructions and guidelines:\n\n";
+// Old format (pi < ~0.68): markdown heading
+const PROJECT_CONTEXT_ANCHOR_OLD = "# Project Context\n\nProject-specific instructions and guidelines:\n\n";
+// New format (pi >= ~0.68): XML tags
+const PROJECT_CONTEXT_OPEN_TAG = "<project_context>";
+const PROJECT_CONTEXT_CLOSE_TAG = "</project_context>";
 const SKILLS_INTRO_LINES = [
 	"The following skills provide specialized instructions for specific tasks.",
 	"Use the read tool to load a skill's file when the task matches its description.",
@@ -122,10 +126,21 @@ function formatSkillsFromOptions(skills: SkillLike[] | undefined): string | null
 }
 
 function getProjectContextRange(prompt: string): { start: number; end: number } | null {
-	const anchorIndex = prompt.indexOf(PROJECT_CONTEXT_ANCHOR);
+	// Try new XML format first (pi >= ~0.68)
+	const openIndex = prompt.indexOf(PROJECT_CONTEXT_OPEN_TAG);
+	if (openIndex !== -1) {
+		const closeIndex = prompt.indexOf(PROJECT_CONTEXT_CLOSE_TAG, openIndex + PROJECT_CONTEXT_OPEN_TAG.length);
+		if (closeIndex !== -1) {
+			const start = openIndex >= 2 && prompt.slice(openIndex - 2, openIndex) === "\n\n" ? openIndex - 2 : openIndex;
+			return { start, end: closeIndex + PROJECT_CONTEXT_CLOSE_TAG.length };
+		}
+	}
+
+	// Fall back to old markdown heading format
+	const anchorIndex = prompt.indexOf(PROJECT_CONTEXT_ANCHOR_OLD);
 	if (anchorIndex === -1) return null;
 
-	const contentStart = anchorIndex + PROJECT_CONTEXT_ANCHOR.length;
+	const contentStart = anchorIndex + PROJECT_CONTEXT_ANCHOR_OLD.length;
 	const dateIndex = prompt.indexOf("\n\nCurrent date:", contentStart);
 	const skillsIndex = prompt.indexOf(`\n\n${SKILLS_INTRO_LINES[0]}`, contentStart);
 
@@ -140,7 +155,21 @@ function getProjectContextRange(prompt: string): { start: number; end: number } 
 function extractProjectContext(prompt: string): string | null {
 	const range = getProjectContextRange(prompt);
 	if (!range) return null;
-	return prompt.slice(range.start, range.end).replace(/^\n\n# Project Context\n\nProject-specific instructions and guidelines:\n\n/, "");
+	const raw = prompt.slice(range.start, range.end);
+
+	// New XML format: parse <project_instructions> tags
+	if (raw.includes(PROJECT_CONTEXT_OPEN_TAG)) {
+		const instructions: string[] = [];
+		const regex = /<project_instructions path="([^"]*)">\n([\s\S]*?)\n<\/project_instructions>/g;
+		let match;
+		while ((match = regex.exec(raw)) !== null) {
+			instructions.push(`## ${match[1]}\n\n${match[2]}`);
+		}
+		return instructions.length > 0 ? instructions.join("\n\n") : null;
+	}
+
+	// Old markdown heading format
+	return raw.replace(/^\n\n# Project Context\n\nProject-specific instructions and guidelines:\n\n/, "");
 }
 
 function getSkillsRange(prompt: string): { start: number; end: number } | null {
