@@ -8,6 +8,7 @@ Configuration is loaded from policy files (first match wins):
 
 Policy keys:
 
+- `enabled` (boolean, default `true`) — set to `false` to start safe-guard disabled; can be toggled per-session with `/safe-guard-toggle`
 - `allowCommandPatterns`
 - `allowWriteOutsideCwd`
 - `allowDestructiveInPaths` (compatibility field)

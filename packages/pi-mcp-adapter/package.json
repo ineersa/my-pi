@@ -1,6 +1,6 @@
 {
   "name": "@ineersa/my-pi-mcp-adapter",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "description": "MCP (Model Context Protocol) adapter extension for Pi coding agent — bridges any MCP server into Pi as first-class tools",
   "type": "module",
   "keywords": [

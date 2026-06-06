@@ -7,8 +7,8 @@
     "compactAfterTokens": 50000,
     "observationsPoolMaxTokens": 20000,
     "model": {
-      "provider": "runpod",
-      "id": "Qwen3.6-27B"
+      "provider": "llama.cpp",
+      "id": "flash"
     },
     "passive": false
   },

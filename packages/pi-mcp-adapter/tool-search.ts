@@ -10,6 +10,9 @@
 import type { AgentToolResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import type { McpExtensionState } from "./state.js";
+import { lazyConnect } from "./init.js";
+import { BUILTIN_NAMES, createDirectToolExecutor } from "./direct-tools.js";
+import { truncateAtWord } from "./utils.js";
 
 
 // ---------------------------------------------------------------------------
@@ -295,6 +298,61 @@ export function buildToolSearchGuidelines(state: McpExtensionState | null): stri
 }
 
 // ---------------------------------------------------------------------------
+// Lazy server bootstrap
+// ---------------------------------------------------------------------------
+
+/**
+ * Connect any lazy servers that have no tool metadata yet and register
+ * their tools with pi.  Restores the active-tool set afterwards so that
+ * only tools explicitly chosen by ToolSearch are activated.
+ */
+async function ensureLazyServersConnected(
+  state: McpExtensionState,
+  pi: ExtensionAPI,
+  getState: () => McpExtensionState | null,
+): Promise<void> {
+  const activeBefore = pi.getActiveTools();
+
+  for (const [serverName, definition] of Object.entries(state.config.mcpServers)) {
+    if (definition.enabled === false) continue;
+
+    const existing = state.toolMetadata.get(serverName);
+    if (existing && existing.length > 0) continue;
+
+    const connected = await lazyConnect(state, serverName);
+    if (!connected) continue;
+
+    // lazyConnect populates state.toolMetadata — register those tools with pi
+    const tools = state.toolMetadata.get(serverName) ?? [];
+    for (const tool of tools) {
+      if (BUILTIN_NAMES.has(tool.name)) continue;
+
+      const spec = {
+        serverName,
+        originalName: tool.originalName,
+        prefixedName: tool.name,
+        description: tool.description || "",
+        inputSchema: tool.inputSchema,
+        resourceUri: tool.resourceUri,
+      };
+
+      pi.registerTool({
+        name: tool.name,
+        label: `MCP: ${tool.originalName}`,
+        description: tool.description || "(no description)",
+        promptSnippet: truncateAtWord(tool.description, 100) || `MCP tool from ${serverName}`,
+        parameters: Type.Unsafe<Record<string, unknown>>(tool.inputSchema || { type: "object", properties: {} }) as any,
+        execute: createDirectToolExecutor(getState, () => null, spec),
+      });
+    }
+  }
+
+  // registerTool auto-activates — restore the pre-registration set so that
+  // only tools explicitly chosen by loadAndActivate() become active.
+  pi.setActiveTools(activeBefore);
+}
+
+// ---------------------------------------------------------------------------
 // ToolSearch tool definition
 // ---------------------------------------------------------------------------
 
@@ -338,6 +396,9 @@ export function createToolSearchTool(
           details: {},
         };
       }
+
+      // Bootstrap any lazy servers that have never been connected
+      await ensureLazyServersConnected(currentState, pi, getState);
 
       const { query } = params;
       const deferredTools = getAllDeferredTools(currentState);

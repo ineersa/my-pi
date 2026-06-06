@@ -3,6 +3,8 @@ import { dirname, join, resolve, basename } from "node:path";
 import { homedir } from "node:os";
 
 export interface SafeGuardPolicy {
+	/** When false, all safe-guard checks are skipped entirely */
+	enabled: boolean;
 	/** Command substrings that bypass destructive/dangerous checks */
 	allowCommandPatterns: string[];
 	/** Absolute paths where writes outside CWD are always allowed */
@@ -59,6 +61,7 @@ const DEFAULT_PROTECTED_READ_PATTERNS: string[] = [
 ];
 
 const DEFAULT_POLICY: SafeGuardPolicy = {
+	enabled: true,
 	allowCommandPatterns: [],
 	allowWriteOutsideCwd: [],
 	allowDestructiveInPaths: [],
@@ -85,6 +88,7 @@ function readPolicyFile(filePath: string): SafeGuardPolicy | null {
 		return {
 			...DEFAULT_POLICY,
 			...raw,
+			enabled: raw.enabled ?? true,
 			protectedReadPatterns: [
 				...DEFAULT_PROTECTED_READ_PATTERNS,
 				...(raw.protectedReadPatterns ?? []),
@@ -116,6 +120,12 @@ function serializePolicy(policy: SafeGuardPolicy): SafeGuardPolicy {
 		),
 	};
 }
+
+export function isPolicyEnabled(cwd: string): boolean {
+	return loadPolicy(cwd).enabled;
+}
+
+
 
 export function savePolicy(cwd: string, policy: SafeGuardPolicy): void {
 	const filePath = policyFilePath(cwd);

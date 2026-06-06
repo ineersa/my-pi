@@ -1,6 +1,6 @@
 {
   "name": "@ineersa/my-pi-subagents",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Subagent orchestration extension for Pi coding agent — single and parallel foreground execution, agent discovery, skill injection, model fallback",
   "type": "module",
   "keywords": [

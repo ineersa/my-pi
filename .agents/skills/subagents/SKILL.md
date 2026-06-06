@@ -1,6 +1,6 @@
 ---
 name: subagents
-description: Delegate tasks to specialized subagents using pi-subagents extension. Covers single and parallel foreground execution. Use when user asks to run subagents, delegates work to agents, mentions scout/worker/reviewer/researcher, or wants to run parallel agent tasks.
+description: Delegate tasks to specialized subagents using pi-subagents extension. Covers single and parallel foreground execution. Use when user asks to run subagents, delegates work to agents, mentions scout/reviewer/researcher, or wants to run parallel agent tasks.
 ---
 
 # Subagents
@@ -23,7 +23,6 @@ Trimmed pi-subagents extension for delegating tasks to specialized agents.
 |-------|-------|---------|
 | **scout** | deepseek/deepseek-v4-flash | Fast codebase recon, compressed context handoff |
 | **reviewer** | (default) + high thinking | Thorough security/correctness/design code review |
-| **worker** | (default) | General-purpose, full capabilities, isolated context |
 
 User agents in `~/.agents/*.md` or `~/.pi/agent/agents/*.md`. Project agents in `.pi/agents/*.md` or `.agents/*.md` (project wins on name collision). Custom agents follow the same frontmatter + markdown body format.
 
@@ -41,7 +40,7 @@ User agents in `~/.agents/*.md` or `~/.pi/agent/agents/*.md`. Project agents in 
 | Need | Mode | Example |
 |------|------|---------|
 | One focused task | single | `{ agent: "scout", task: "..." }` |
-| Independent concurrent work | parallel | `{ tasks: [{ agent: "scout", task: "..." }, { agent: "worker", task: "..." }] }` |
+| Independent concurrent work | parallel | `{ tasks: [{ agent: "scout", task: "..." }, { agent: "scout", task: "..." }] }` |
 
 Only single and parallel foreground execution are supported. There is no chain, async/background, worktree, or intercom mode.
 

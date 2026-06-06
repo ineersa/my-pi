@@ -11,6 +11,7 @@ import {
 	isCommandAllowed,
 	isPathInList,
 	isProtectedReadPath,
+	isPolicyEnabled,
 	addCommandAllow,
 	addWritePathAllow,
 	addProtectedReadPattern,
@@ -29,12 +30,22 @@ function truncateCmd(cmd: string, max = 120): string {
 	return cmd.length > max ? cmd.substring(0, max) + "…" : cmd;
 }
 
+// ─── session-level toggle (in memory, seeded from policy file on first use) ──
+
+let sessionEnabled: boolean | null = null;
+
+function isEnabled(cwd: string): boolean {
+	if (sessionEnabled === null) sessionEnabled = isPolicyEnabled(cwd);
+	return sessionEnabled;
+}
+
 // ─── extension ──────────────────────────────────────────────────────────
 
 export default function safeGuardExtension(pi: ExtensionAPI): void {
 	// ─── BASH TOOL ─────────────────────────────────────────────────────
 	pi.on("tool_call", async (event, ctx) => {
 		if (!isToolCallEventType("bash", event)) return;
+		if (!isEnabled(ctx.cwd)) return;
 
 		const command: string = event.input.command ?? "";
 		const policy = loadPolicy(ctx.cwd);
@@ -81,6 +92,7 @@ export default function safeGuardExtension(pi: ExtensionAPI): void {
 		const isWrite = isToolCallEventType("write", event);
 		const isEdit = isToolCallEventType("edit", event);
 		if (!isWrite && !isEdit) return;
+		if (!isEnabled(ctx.cwd)) return;
 
 		const rawPath: string = (event.input.path ?? "").replace(/^@/, "");
 		if (!rawPath) return;
@@ -119,6 +131,7 @@ export default function safeGuardExtension(pi: ExtensionAPI): void {
 	// ─── READ TOOL ─────────────────────────────────────────────────────
 	pi.on("tool_call", async (event, ctx) => {
 		if (!isToolCallEventType("read", event)) return;
+		if (!isEnabled(ctx.cwd)) return;
 
 		const rawPath: string = (event.input.path ?? "").replace(/^@/, "");
 		if (!rawPath) return;
@@ -169,8 +182,10 @@ export default function safeGuardExtension(pi: ExtensionAPI): void {
 
 			const activeFile = hasLocal ? localPath : hasGlobal ? globalPath : "(none — using defaults)";
 
+			const sessionStatus = isEnabled(ctx.cwd) ? "✅ enabled" : "⏸ disabled (session override)";
 			const lines = [
 				`Policy file: ${activeFile}`,
+				`Session: ${sessionStatus}`,
 				``,
 				`Allowed commands (${policy.allowCommandPatterns.length}):`,
 				...(policy.allowCommandPatterns.length
@@ -244,6 +259,28 @@ export default function safeGuardExtension(pi: ExtensionAPI): void {
 			}
 			removeProtectedReadPattern(ctx.cwd, args.trim());
 			ctx.ui.notify(`🔓 Removed protected read pattern: ${args.trim()}`, "info");
+		},
+	});
+
+	pi.registerCommand("safe-guard-toggle", {
+		description: "Toggle safe-guard on/off for this session (resets on restart)",
+		handler: async (args, ctx) => {
+			const arg = args?.trim().toLowerCase();
+			if (arg === "on" || arg === "enable" || arg === "true") {
+				sessionEnabled = true;
+				ctx.ui.notify("✅ safe-guard enabled (this session)", "info");
+			} else if (arg === "off" || arg === "disable" || arg === "false") {
+				sessionEnabled = false;
+				ctx.ui.notify("⏸ safe-guard disabled for this session — resets on restart", "warning");
+			} else {
+				sessionEnabled = !isEnabled(ctx.cwd);
+				ctx.ui.notify(
+					sessionEnabled
+						? "✅ safe-guard enabled (this session)"
+						: "⏸ safe-guard disabled for this session — resets on restart",
+					sessionEnabled ? "info" : "warning",
+				);
+			}
 		},
 	});
 }
